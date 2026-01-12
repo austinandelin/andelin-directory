@@ -62,20 +62,14 @@
 
         <!-- Main Body -->
         <main class="flex-1 flex overflow-hidden">
-            <!-- Sidebar (Directory View) -->
             <aside id="sidebar" class="w-full md:w-96 bg-white border-r overflow-y-auto sidebar-height">
-                <!-- Search bar for mobile -->
                 <div class="p-4 md:hidden border-b">
                     <input type="text" onkeyup="handleSearch()" placeholder="Search names..." 
                            class="w-full px-4 py-2 border rounded-lg bg-gray-50">
                 </div>
-                
-                <div id="directory-list" class="p-2 space-y-1">
-                    <!-- Dynamic Tree Content Here -->
-                </div>
+                <div id="directory-list" class="p-2 space-y-1"></div>
             </aside>
 
-            <!-- Content Area (Contact Card) -->
             <section id="contact-panel" class="flex-1 bg-gray-50 overflow-y-auto content-height mobile-hidden p-6 lg:p-12">
                 <div id="empty-state" class="h-full flex flex-col items-center justify-center text-gray-400">
                     <i data-lucide="user" class="w-16 h-16 mb-4 opacity-20"></i>
@@ -85,9 +79,7 @@
                 <div id="contact-card" class="hidden max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                     <div class="h-32 bg-blue-600 relative">
                         <div class="absolute -bottom-12 left-8 p-1 bg-white rounded-full">
-                            <div class="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center text-blue-600 font-bold text-3xl" id="avatar-initial">
-                                JD
-                            </div>
+                            <div class="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center text-blue-600 font-bold text-3xl" id="avatar-initial">JD</div>
                         </div>
                     </div>
                     
@@ -98,8 +90,7 @@
                                 <p id="card-id" class="text-blue-600 font-mono font-medium">ID: 11132</p>
                             </div>
                             <button onclick="editOnGithub()" class="text-sm text-gray-500 hover:text-blue-600 flex items-center gap-1">
-                                <i data-lucide="edit-3" class="w-4 h-4"></i>
-                                Edit
+                                <i data-lucide="edit-3" class="w-4 h-4"></i> Edit
                             </button>
                         </div>
 
@@ -122,14 +113,21 @@
                                     <label class="text-xs font-bold text-gray-400 uppercase tracking-wider">Birthday</label>
                                     <p id="card-birthday" class="text-lg font-medium flex items-center gap-2 mt-1">
                                         <i data-lucide="cake" class="w-5 h-5 text-pink-400"></i>
-                                        <span>January 1, 1990</span>
+                                        <span>Not listed</span>
                                     </p>
+                                </div>
+                                <div id="spouse-section" class="hidden">
+                                    <label class="text-xs font-bold text-gray-400 uppercase tracking-wider">Spouse</label>
+                                    <button id="card-spouse-btn" class="text-lg font-medium text-blue-600 flex items-center gap-2 mt-1 hover:underline text-left">
+                                        <i data-lucide="heart" class="w-5 h-5 text-red-400"></i>
+                                        <span id="card-spouse-name">Spouse Name</span>
+                                    </button>
                                 </div>
                                 <div>
                                     <label class="text-xs font-bold text-gray-400 uppercase tracking-wider">Phone Number</label>
                                     <a id="card-phone-link" href="#" class="text-lg font-medium text-blue-600 flex items-center gap-2 mt-1 hover:underline">
                                         <i data-lucide="phone" class="w-5 h-5"></i>
-                                        <span id="card-phone">555-123-4567</span>
+                                        <span id="card-phone">Not listed</span>
                                     </a>
                                 </div>
                             </div>
@@ -138,11 +136,9 @@
                                     <label class="text-xs font-bold text-gray-400 uppercase tracking-wider">Mailing Address</label>
                                     <div class="flex gap-2 mt-1">
                                         <i data-lucide="map-pin" class="w-5 h-5 text-red-400 shrink-0 mt-1"></i>
-                                        <address id="card-address" class="not-italic text-lg text-gray-700">
-                                            123 Main St<br>Springfield, IL
-                                        </address>
+                                        <address id="card-address" class="not-italic text-lg text-gray-700">Not listed</address>
                                     </div>
-                                    <a id="card-map-link" href="#" target="_blank" class="text-sm text-blue-500 mt-2 inline-block hover:underline font-medium">Open in Maps →</a>
+                                    <a id="card-map-link" href="#" target="_blank" class="text-sm text-blue-500 mt-2 inline-block hover:underline font-medium hidden">Open in Maps →</a>
                                 </div>
                             </div>
                         </div>
@@ -161,284 +157,206 @@
             <div class="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl">
                 <div class="flex justify-between items-center mb-6">
                     <h3 class="text-xl font-bold">Directory Filters</h3>
-                    <button onclick="toggleFilters()" class="text-gray-400 hover:text-gray-600">
-                        <i data-lucide="x" class="w-5 h-5"></i>
-                    </button>
+                    <button onclick="toggleFilters()" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-5 h-5"></i></button>
                 </div>
-
                 <div class="space-y-6">
-                    <!-- Branch Filter -->
                     <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">Show from Henry ID</label>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">Show from:</label>
                         <div class="flex gap-2">
-                            <input type="text" id="filter-from-input" placeholder="e.g. 13261" 
-                                   class="flex-1 px-3 py-2 border rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none">
+                            <input type="text" id="filter-from-input" placeholder="e.g. 13261" class="flex-1 px-3 py-2 border rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none">
                             <button onclick="clearFromFilter()" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium">Clear</button>
                         </div>
-                        <p class="text-[10px] text-gray-500 mt-1 italic">Only shows descendants of this ID.</p>
                     </div>
-
-                    <!-- Generation Filter -->
                     <div class="pt-4 border-t">
                         <label class="flex items-center gap-3 cursor-pointer">
                             <input type="checkbox" id="filter-ancestors" checked onchange="toggleAncestorFilter()" class="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                             <span class="text-gray-700 font-medium">Hide Ancestors (G1-G4)</span>
                         </label>
-                        <p class="text-xs text-gray-500 pl-8 mt-1 italic">Starts view at 5th generation (5+ digit IDs).</p>
                     </div>
                 </div>
-
                 <div class="mt-8">
-                    <button onclick="applyFilters()" class="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200">
-                        Apply Filters
-                    </button>
+                    <button onclick="applyFilters()" class="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200">Apply Filters</button>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // --- DATA STATE ---
-        let familyData = []; // Initialized empty; populated via fetch()
-
+        let familyData = []; 
         const FAMILY_PASSWORD = "sillygoose"; 
         let hideAncestors = true;
         let filterFromId = "";
         let selectedPerson = null;
 
-        // --- AUTH & INITIALIZATION ---
-
         function checkPassword() {
             const input = document.getElementById('password-input').value;
-            const error = document.getElementById('login-error');
             if (input === FAMILY_PASSWORD) {
                 document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('app-interface').classList.remove('hidden');
                 initApp();
             } else {
-                error.classList.remove('hidden');
-                document.getElementById('password-input').value = '';
+                document.getElementById('login-error').classList.remove('hidden');
             }
         }
 
-        /**
-         * Fetches data from external family.json file
-         */
         async function initApp() {
-            const listContainer = document.getElementById('directory-list');
             try {
                 const response = await fetch('family.json');
-                if (!response.ok) throw new Error('Could not load family.json');
-                
                 familyData = await response.json();
-                
-                lucide.createIcons();
                 renderDirectory();
             } catch (err) {
-                console.error("Data fetch error:", err);
-                listContainer.innerHTML = `
-                    <div class="p-6 text-center">
-                        <i data-lucide="alert-circle" class="w-12 h-12 text-red-400 mx-auto mb-3"></i>
-                        <p class="text-red-500 font-medium">Failed to load directory data.</p>
-                        <p class="text-xs text-gray-500 mt-2">Ensure family.json exists in the same folder as this file.</p>
-                    </div>
-                `;
-                lucide.createIcons();
+                console.error("Data load error", err);
+                document.getElementById('directory-list').innerHTML = "<p class='p-4 text-red-500'>Error loading family.json</p>";
             }
+            lucide.createIcons();
         }
-
-        // --- RENDERING ---
 
         function renderDirectory(searchTerm = "") {
             const listContainer = document.getElementById('directory-list');
             listContainer.innerHTML = "";
-
-            if (!familyData || familyData.length === 0) return;
+            if (!familyData.length) return;
 
             const filteredData = familyData.filter(p => {
                 const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.id.includes(searchTerm);
                 const matchesBranch = filterFromId ? p.id.startsWith(filterFromId) : true;
-                const isAncestral = p.id.length < 5;
+                const isAncestral = p.id.length < 5 && !p.id.includes('s');
                 const ancestorGuard = (hideAncestors && !searchTerm && !filterFromId) ? !isAncestral : true;
-
                 return matchesSearch && matchesBranch && ancestorGuard;
             });
 
             if (searchTerm || (filterFromId && filteredData.length < 10)) {
                 filteredData.sort((a,b) => a.id.localeCompare(b.id));
-                filteredData.forEach(p => {
-                    listContainer.appendChild(createPersonItem(p));
-                });
+                filteredData.forEach(p => listContainer.appendChild(createPersonItem(p)));
             } else {
                 buildTree(filteredData, listContainer);
             }
-            
             updateFilterIndicator();
             lucide.createIcons();
         }
 
         function buildTree(data, container) {
             data.sort((a, b) => a.id.localeCompare(b.id));
-
             data.forEach(p => {
-                const hasChildren = data.some(child => child.id !== p.id && child.id.startsWith(p.id));
+                const isSpouse = p.id.includes('s');
+                const cleanId = isSpouse ? p.id.split('s')[0] : p.id;
                 
-                if (hasChildren) {
+                // Children check (only lineal descendants have kids in the tree structure)
+                const hasChildren = data.some(child => !child.id.includes('s') && child.id.startsWith(p.id) && child.id !== p.id);
+                
+                if (hasChildren && !isSpouse) {
                     const details = document.createElement('details');
                     details.className = "group";
                     details.open = true;
-                    
                     const summary = document.createElement('summary');
                     summary.className = "flex items-center gap-2 p-2 hover:bg-gray-50 rounded-lg cursor-pointer transition";
-                    summary.innerHTML = `
-                        <i data-lucide="chevron-right" class="w-4 h-4 text-gray-400 group-open:rotate-90 transition-transform"></i>
+                    summary.innerHTML = `<i data-lucide="chevron-right" class="w-4 h-4 text-gray-400 group-open:rotate-90"></i>
                         <span class="font-medium text-gray-800">${p.name}</span>
-                        <span class="text-[10px] text-gray-400 font-mono ml-auto">${p.id}</span>
-                    `;
-                    summary.onclick = (e) => {
-                        if (!e.target.closest('i')) selectPerson(p);
-                    };
-
-                    const childrenContainer = document.createElement('div');
-                    childrenContainer.className = "henry-indent mt-1 space-y-1";
-                    
+                        <span class="text-[10px] text-gray-400 font-mono ml-auto">${p.id}</span>`;
+                    summary.onclick = (e) => { if (!e.target.closest('i')) selectPerson(p); };
+                    const childBox = document.createElement('div');
+                    childBox.className = "henry-indent mt-1 space-y-1";
                     details.appendChild(summary);
-                    details.appendChild(childrenContainer);
+                    details.appendChild(childBox);
                     container.appendChild(details);
-                    
-                    p._container = childrenContainer;
+                    p._container = childBox;
                 } else {
-                    const parentId = p.id.substring(0, p.id.length - 1);
+                    const parentId = cleanId.substring(0, cleanId.length - 1);
                     const parent = data.find(parent => parent.id === parentId);
-                    
                     const item = createPersonItem(p);
-                    if (parent && parent._container) {
-                        parent._container.appendChild(item);
-                    } else {
-                        container.appendChild(item);
-                    }
+                    if (parent && parent._container) parent._container.appendChild(item);
+                    else container.appendChild(item);
                 }
             });
         }
 
         function createPersonItem(p) {
+            const isSpouse = p.id.includes('s');
             const div = document.createElement('div');
-            div.className = "flex items-center justify-between p-2 hover:bg-blue-50 hover:text-blue-700 rounded-lg cursor-pointer transition group";
-            div.innerHTML = `
-                <div class="flex items-center gap-2">
-                    <div class="w-2 h-2 rounded-full bg-gray-200 group-hover:bg-blue-400"></div>
-                    <span class="text-sm font-medium">${p.name}</span>
-                </div>
-                <span class="text-[10px] text-gray-400 font-mono">${p.id}</span>
-            `;
+            div.className = "flex items-center justify-between p-2 hover:bg-blue-50 hover:text-blue-700 rounded-lg cursor-pointer group";
+            div.innerHTML = `<div class="flex items-center gap-2">
+                <i data-lucide="${isSpouse ? 'link' : 'user'}" class="w-3 h-3 ${isSpouse ? 'text-pink-400' : 'text-gray-300'}"></i>
+                <span class="text-sm font-medium">${p.name}</span>
+            </div><span class="text-[10px] text-gray-400 font-mono">${p.id}</span>`;
             div.onclick = () => selectPerson(p);
             return div;
         }
 
         function selectPerson(p) {
             selectedPerson = p;
+            if (window.innerWidth < 768) closeContact(false);
             
-            if (window.innerWidth < 768) {
-                document.getElementById('sidebar').classList.add('mobile-hidden');
-                document.getElementById('contact-panel').classList.remove('mobile-hidden');
-                document.getElementById('mobile-back').classList.remove('hidden');
-            }
-
             document.getElementById('empty-state').classList.add('hidden');
             document.getElementById('contact-card').classList.remove('hidden');
-            
             document.getElementById('card-name').textContent = p.name;
             document.getElementById('card-id').textContent = `ID: ${p.id}`;
             document.getElementById('card-birthday').querySelector('span').textContent = p.birthday || "Not listed";
             document.getElementById('card-phone').textContent = p.phone || "Not listed";
             document.getElementById('card-phone-link').href = `tel:${p.phone}`;
-            document.getElementById('card-address').innerHTML = (p.address || "No address listed").replace(/\n/g, '<br>');
-            document.getElementById('card-map-link').href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.address)}`;
+            document.getElementById('card-address').textContent = p.address || "Not listed";
+            const mapLink = document.getElementById('card-map-link');
+            if (p.address) {
+                mapLink.classList.remove('hidden');
+                mapLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.address)}`;
+            } else mapLink.classList.add('hidden');
             document.getElementById('card-updated').textContent = p.updated;
-            
-            const initials = p.name.split(' ').map(n => n[0]).join('').substring(0,2);
-            document.getElementById('avatar-initial').textContent = initials;
 
+            // Spouse Handling
+            const spouseSection = document.getElementById('spouse-section');
+            const cleanId = p.id.includes('s') ? p.id.split('s')[0] : p.id;
+            const spouseId = p.id.includes('s') ? cleanId : p.id + 's';
+            const spouse = familyData.find(f => f.id === spouseId || f.id === spouseId + '1'); // Check s or s1
+            
+            if (spouse) {
+                spouseSection.classList.remove('hidden');
+                document.getElementById('card-spouse-name').textContent = spouse.name;
+                document.getElementById('card-spouse-btn').onclick = () => selectPerson(spouse);
+            } else {
+                spouseSection.classList.add('hidden');
+            }
+
+            document.getElementById('avatar-initial').textContent = p.name.split(' ').map(n => n[0]).join('').substring(0,2);
             lucide.createIcons();
         }
 
-        // --- FILTER LOGIC ---
-
-        function toggleFilters() {
-            const modal = document.getElementById('filter-modal');
-            modal.classList.toggle('hidden');
-            if (!modal.classList.contains('hidden')) {
-                document.getElementById('filter-from-input').value = filterFromId;
-            }
-        }
-
-        function applyFilters() {
-            filterFromId = document.getElementById('filter-from-input').value.trim();
-            hideAncestors = document.getElementById('filter-ancestors').checked;
-            toggleFilters();
-            renderDirectory();
-        }
-
-        function clearFromFilter() {
-            document.getElementById('filter-from-input').value = "";
-            filterFromId = "";
-            renderDirectory();
-        }
-
-        function updateFilterIndicator() {
-            const indicator = document.getElementById('filter-indicator');
-            if (filterFromId || !hideAncestors) {
-                indicator.classList.remove('hidden');
-            } else {
-                indicator.classList.add('hidden');
-            }
-        }
-
-        function toggleAncestorFilter() {
-            hideAncestors = document.getElementById('filter-ancestors').checked;
-        }
-
-        // --- RELATIONSHIP NAVIGATION ---
-
         function jumpToRel(type) {
             if (!selectedPerson) return;
-            const currentId = selectedPerson.id;
+            // Strip spouse suffix for calculation
+            let baseId = selectedPerson.id.includes('s') ? selectedPerson.id.split('s')[0] : selectedPerson.id;
             
-            if (type === 'siblings') {
-                filterFromId = currentId.substring(0, currentId.length - 1);
-            } else if (type === 'children') {
-                filterFromId = currentId;
-            } else if (type === 'parents') {
-                filterFromId = currentId.substring(0, Math.max(0, currentId.length - 2));
-            }
+            if (type === 'siblings') filterFromId = baseId.substring(0, baseId.length - 1);
+            else if (type === 'children') filterFromId = baseId;
+            else if (type === 'parents') filterFromId = baseId.substring(0, Math.max(0, baseId.length - 2));
 
             document.getElementById('filter-from-input').value = filterFromId;
             renderDirectory();
-            if (window.innerWidth < 768) closeContact();
+            if (window.innerWidth < 768) closeContact(true);
         }
 
-        // --- UTILS ---
-
-        function closeContact() {
-            document.getElementById('sidebar').classList.remove('mobile-hidden');
-            document.getElementById('contact-panel').classList.add('mobile-hidden');
-            document.getElementById('mobile-back').classList.add('hidden');
+        function closeContact(toList) {
+            if (toList) {
+                document.getElementById('sidebar').classList.remove('mobile-hidden');
+                document.getElementById('contact-panel').classList.add('mobile-hidden');
+                document.getElementById('mobile-back').classList.add('hidden');
+            } else {
+                document.getElementById('sidebar').classList.add('mobile-hidden');
+                document.getElementById('contact-panel').classList.remove('mobile-hidden');
+                document.getElementById('mobile-back').classList.remove('hidden');
+            }
         }
 
-        function handleSearch() {
-            const query = (document.getElementById('search-input').value || "").trim();
-            renderDirectory(query);
+        function handleSearch() { renderDirectory(document.getElementById('search-input').value.trim()); }
+        function toggleFilters() { document.getElementById('filter-modal').classList.toggle('hidden'); }
+        function applyFilters() { 
+            filterFromId = document.getElementById('filter-from-input').value.trim();
+            hideAncestors = document.getElementById('filter-ancestors').checked;
+            toggleFilters(); 
+            renderDirectory(); 
         }
-
-        function editOnGithub() {
-            const repoUrl = "https://github.com/"; 
-            window.open(repoUrl, '_blank');
-        }
-
-        document.getElementById('password-input').addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') checkPassword();
-        });
-
+        function clearFromFilter() { document.getElementById('filter-from-input').value = ""; filterFromId = ""; renderDirectory(); }
+        function updateFilterIndicator() { document.getElementById('filter-indicator').classList.toggle('hidden', !filterFromId && hideAncestors); }
+        function toggleAncestorFilter() { hideAncestors = document.getElementById('filter-ancestors').checked; }
+        function editOnGithub() { window.open("https://github.com/", '_blank'); }
+        document.getElementById('password-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') checkPassword(); });
     </script>
 </body>
 </html>
