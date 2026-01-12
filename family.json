@@ -25,7 +25,7 @@
   },
   {
     "id": "1131",
-    "name": "Olof Andelin",
+    "name": "Robert Andelin",
     "birthday": "1923-05-12",
     "phone": "",
     "address": "",
@@ -34,7 +34,15 @@
   {
     "id": "11312",
     "name": "Mark Andelin",
-    "birthday": "1954-01-28",
+    "birthday": "1952-01-28",
+    "phone": "208-630-3264",
+    "address": "11925 Holbrook Ln, Ola, ID 83657",
+    "updated": "2026-01-11"
+  },
+  {
+    "id": "11312s",
+    "name": "Tia Andelin",
+    "birthday": "1954-01-25",
     "phone": "208-630-3264",
     "address": "11925 Holbrook Ln, Ola, ID 83657",
     "updated": "2026-01-11"
@@ -56,9 +64,25 @@
     "updated": "2026-01-11"
   },
   {
+    "id": "113122s",
+    "name": "Carrie Andelin",
+    "birthday": "1978-10-04",
+    "phone": "",
+    "address": "",
+    "updated": "2026-01-11"
+  },
+  {
     "id": "1131221",
     "name": "Spencer Andelin",
     "birthday": "2002-10-21",
+    "phone": "",
+    "address": "",
+    "updated": "2026-01-11"
+  },
+  {
+    "id": "1131222",
+    "name": "Katelyn Andelin",
+    "birthday": "2004-06-22",
     "phone": "",
     "address": "",
     "updated": "2026-01-11"
@@ -84,14 +108,6 @@
     "name": "Melanie Andelin",
     "birthday": "2000-10-11",
     "phone": "801-369-5977",
-    "address": "550 Pamlar Ave B, San Jose, CA 95128",
-    "updated": "2026-01-11"
-  },
-  {
-    "id": "11312111",
-    "name": "Baby Andelin",
-    "birthday": "",
-    "phone": "",
     "address": "550 Pamlar Ave B, San Jose, CA 95128",
     "updated": "2026-01-11"
   },
