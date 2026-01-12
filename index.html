@@ -40,7 +40,7 @@
         <!-- Header -->
         <header class="h-16 bg-white border-b flex items-center justify-between px-4 lg:px-8 shrink-0">
             <div class="flex items-center gap-2">
-                <button id="mobile-back" onclick="closeContact()" class="md:hidden p-2 hover:bg-gray-100 rounded-full hidden">
+                <button id="mobile-back" onclick="closeContact(true)" class="md:hidden p-2 hover:bg-gray-100 rounded-full hidden">
                     <i data-lucide="arrow-left"></i>
                 </button>
                 <h1 class="font-bold text-xl">Family Directory</h1>
@@ -67,7 +67,9 @@
                     <input type="text" onkeyup="handleSearch()" placeholder="Search names..." 
                            class="w-full px-4 py-2 border rounded-lg bg-gray-50">
                 </div>
-                <div id="directory-list" class="p-2 space-y-1"></div>
+                <div id="directory-list" class="p-2 space-y-1">
+                    <div class="p-8 text-center text-gray-400">Loading family data...</div>
+                </div>
             </aside>
 
             <section id="contact-panel" class="flex-1 bg-gray-50 overflow-y-auto content-height mobile-hidden p-6 lg:p-12">
@@ -144,7 +146,7 @@
                         </div>
 
                         <div class="mt-12 pt-8 border-t border-gray-50 flex items-center justify-between text-gray-400 text-xs italic">
-                            <span>Last verified: <span id="card-updated">2024-05-01</span></span>
+                            <span>Last verified: <span id="card-updated">Not listed</span></span>
                             <span>Henry System ID</span>
                         </div>
                     </div>
@@ -161,7 +163,7 @@
                 </div>
                 <div class="space-y-6">
                     <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">Show from:</label>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">Show from Henry ID</label>
                         <div class="flex gap-2">
                             <input type="text" id="filter-from-input" placeholder="e.g. 13261" class="flex-1 px-3 py-2 border rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none">
                             <button onclick="clearFromFilter()" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium">Clear</button>
@@ -200,13 +202,42 @@
         }
 
         async function initApp() {
+            const listContainer = document.getElementById('directory-list');
             try {
-                const response = await fetch('//family.json');
-                familyData = await response.json();
+                // Determine base path for debugging
+                const path = 'family.json';
+                console.log("Fetching from path:", path);
+                
+                const response = await fetch(path, { cache: "no-store" });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP Error ${response.status}: ${response.statusText}`);
+                }
+                
+                const text = await response.text();
+                try {
+                    familyData = JSON.parse(text);
+                } catch (parseError) {
+                    throw new Error("JSON Syntax Error: Please check your family.json for missing quotes or extra commas.");
+                }
+
                 renderDirectory();
             } catch (err) {
-                console.error("Data load error", err);
-                document.getElementById('directory-list').innerHTML = "<p class='p-4 text-red-500'>Error loading family.json</p>";
+                console.error("Detailed Data load error:", err);
+                listContainer.innerHTML = `
+                    <div class="p-6 text-center text-red-500">
+                        <i data-lucide="alert-triangle" class="w-12 h-12 mx-auto mb-2"></i>
+                        <p class="font-bold">Error loading family.json</p>
+                        <p class="text-xs mt-2 bg-red-50 p-2 rounded border border-red-100 font-mono text-left overflow-auto">${err.message}</p>
+                        <p class="text-[10px] text-gray-500 mt-4 text-left">
+                            Quick Fix Checklist:<br>
+                            1. Ensure family.json is in the EXACT same folder as index.html.<br>
+                            2. Remove any leading slashes from your fetch code.<br>
+                            3. Ensure file is named exactly 'family.json' (all lowercase).<br>
+                            4. Verify your browser is not blocking local file access (CORS).
+                        </p>
+                    </div>
+                `;
             }
             lucide.createIcons();
         }
@@ -214,7 +245,7 @@
         function renderDirectory(searchTerm = "") {
             const listContainer = document.getElementById('directory-list');
             listContainer.innerHTML = "";
-            if (!familyData.length) return;
+            if (!familyData || !familyData.length) return;
 
             const filteredData = familyData.filter(p => {
                 const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.id.includes(searchTerm);
@@ -240,7 +271,6 @@
                 const isSpouse = p.id.includes('s');
                 const cleanId = isSpouse ? p.id.split('s')[0] : p.id;
                 
-                // Children check (only lineal descendants have kids in the tree structure)
                 const hasChildren = data.some(child => !child.id.includes('s') && child.id.startsWith(p.id) && child.id !== p.id);
                 
                 if (hasChildren && !isSpouse) {
@@ -298,13 +328,12 @@
                 mapLink.classList.remove('hidden');
                 mapLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.address)}`;
             } else mapLink.classList.add('hidden');
-            document.getElementById('card-updated').textContent = p.updated;
+            document.getElementById('card-updated').textContent = p.updated || "Not listed";
 
-            // Spouse Handling
             const spouseSection = document.getElementById('spouse-section');
             const cleanId = p.id.includes('s') ? p.id.split('s')[0] : p.id;
             const spouseId = p.id.includes('s') ? cleanId : p.id + 's';
-            const spouse = familyData.find(f => f.id === spouseId || f.id === spouseId + '1'); // Check s or s1
+            const spouse = familyData.find(f => f.id === spouseId || f.id === spouseId + '1'); 
             
             if (spouse) {
                 spouseSection.classList.remove('hidden');
@@ -320,7 +349,6 @@
 
         function jumpToRel(type) {
             if (!selectedPerson) return;
-            // Strip spouse suffix for calculation
             let baseId = selectedPerson.id.includes('s') ? selectedPerson.id.split('s')[0] : selectedPerson.id;
             
             if (type === 'siblings') filterFromId = baseId.substring(0, baseId.length - 1);
