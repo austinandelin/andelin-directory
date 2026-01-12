@@ -21,15 +21,16 @@
         .breadcrumb-chip { 
             display: inline-flex; 
             align-items: center; 
-            padding: 0.25rem 0.75rem; 
-            background-color: #f3f4f6; 
+            padding: 0.2rem 0.6rem; 
+            background-color: rgba(255, 255, 255, 0.2); 
             border-radius: 9999px; 
-            font-size: 0.75rem; 
+            font-size: 0.7rem; 
             font-weight: 500; 
-            color: #4b5563;
+            color: white;
             transition: all 0.2s;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
-        .breadcrumb-chip:hover { background-color: #e5e7eb; color: #1f2937; }
+        .breadcrumb-chip:hover { background-color: rgba(255, 255, 255, 0.3); }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900 overflow-hidden">
@@ -105,29 +106,32 @@
                 </div>
 
                 <div id="contact-card" class="hidden max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div class="h-32 bg-blue-600 relative">
-                        <div class="absolute -bottom-12 left-8 p-1 bg-white rounded-full">
-                            <div class="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center text-blue-600 font-bold text-3xl" id="avatar-initial">JD</div>
+                    <!-- Hero Section with Name, ID, Breadcrumbs -->
+                    <div id="card-hero" class="p-8 text-white relative transition-colors duration-500">
+                        <!-- Henry ID in top right -->
+                        <div class="absolute top-6 right-8 text-right">
+                            <label class="block text-[10px] font-bold uppercase tracking-widest opacity-70">Henry ID</label>
+                            <p id="card-id" class="font-mono font-bold text-sm">11132</p>
+                        </div>
+
+                        <!-- Name & Breadcrumbs -->
+                        <div class="max-w-[calc(100%-120px)]">
+                            <h2 id="card-name" class="text-3xl font-bold leading-tight">John Doe</h2>
+                            <div id="card-breadcrumbs" class="flex flex-wrap items-center gap-2 mt-4">
+                                <!-- Chips generated here -->
+                            </div>
                         </div>
                     </div>
                     
-                    <div class="pt-16 pb-8 px-8">
-                        <div class="flex justify-between items-start">
-                            <div class="flex-1">
-                                <h2 id="card-name" class="text-3xl font-bold text-gray-900 leading-tight">John Doe</h2>
-                                <!-- Breadcrumbs -->
-                                <div id="card-breadcrumbs" class="flex flex-wrap items-center gap-2 mt-3">
-                                    <!-- Chips generated here -->
-                                </div>
-                                <p id="card-id" class="text-blue-600 font-mono font-bold text-xs mt-3 uppercase tracking-widest opacity-60">ID: 11132</p>
-                            </div>
+                    <div class="p-8">
+                        <div class="flex justify-end">
                             <button onclick="editOnGithub()" class="text-sm text-gray-500 hover:text-blue-600 flex items-center gap-1 shrink-0">
                                 <i data-lucide="edit-3" class="w-4 h-4"></i> Edit
                             </button>
                         </div>
 
                         <!-- Relationship Shortcut Buttons -->
-                        <div class="flex flex-wrap gap-2 mt-8 p-1 bg-gray-50 rounded-xl border border-gray-100">
+                        <div class="flex flex-wrap gap-2 mt-4 p-1 bg-gray-50 rounded-xl border border-gray-100">
                             <button onclick="jumpToRel('parents')" class="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg hover:bg-white hover:shadow-sm text-xs font-semibold text-gray-600 transition">
                                 <i data-lucide="users" class="w-4 h-4"></i> Show Parents
                             </button>
@@ -205,7 +209,6 @@
                             <input type="text" id="filter-from-input" placeholder="e.g. 13261" class="flex-1 px-3 py-2 border rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none">
                             <button onclick="clearFromFilter()" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium">Clear</button>
                         </div>
-                        <p class="text-[10px] text-gray-400 mt-1 italic">This shows the person and all their descendants.</p>
                     </div>
                     <div class="pt-4 border-t">
                         <label class="flex items-center gap-3 cursor-pointer">
@@ -228,8 +231,14 @@
         // Filter States
         let hideAncestors = true;
         let filterFromId = "";
-        let relFilterMode = "branch"; // 'branch', 'siblings', 'parents', 'children'
+        let relFilterMode = "branch";
         let selectedPerson = null;
+
+        // Visual Palette
+        const COLORS = [
+            'bg-blue-600', 'bg-indigo-600', 'bg-emerald-600', 
+            'bg-rose-600', 'bg-amber-600', 'bg-violet-600', 'bg-teal-600'
+        ];
 
         function checkPassword() {
             const input = document.getElementById('password-input').value;
@@ -247,7 +256,6 @@
             try {
                 const response = await fetch('family.json', { cache: "no-store" });
                 if (!response.ok) throw new Error(`HTTP Error ${response.status}: ${response.statusText}`);
-                
                 const text = await response.text();
                 familyData = JSON.parse(text);
                 renderDirectory();
@@ -263,7 +271,6 @@
             listContainer.innerHTML = "";
             if (!familyData || !familyData.length) return;
 
-            // Handle Relationship Filter Alert visibility
             const alertBox = document.getElementById('rel-filter-alert');
             const alertText = document.getElementById('rel-filter-text');
             if (filterFromId && relFilterMode !== 'branch') {
@@ -275,47 +282,34 @@
 
             const filteredData = familyData.filter(p => {
                 const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || p.id.includes(searchTerm);
-                if (searchTerm) return matchesSearch; // Search overrides other strict filters
+                if (searchTerm) return matchesSearch;
 
                 if (!filterFromId) {
                     const isAncestral = p.id.length < 5 && !p.id.includes('s');
                     return hideAncestors ? !isAncestral : true;
                 }
 
-                // Strict Relationship Filtering Logic
                 const isSpouse = p.id.includes('s');
                 const baseId = isSpouse ? p.id.split('s')[0] : p.id;
                 const filterBaseId = filterFromId.includes('s') ? filterFromId.split('s')[0] : filterFromId;
 
                 switch(relFilterMode) {
                     case 'siblings':
-                        // Must share the same parent prefix and have the same ID length
                         const parentPrefix = filterBaseId.substring(0, filterBaseId.length - 1);
-                        const isSameGeneration = baseId.length === filterBaseId.length;
-                        return baseId.startsWith(parentPrefix) && isSameGeneration;
-                    
+                        return baseId.startsWith(parentPrefix) && baseId.length === filterBaseId.length;
                     case 'parents':
-                        // Only the exact parent ID or parent's spouse
-                        const parentId = filterBaseId.substring(0, filterBaseId.length - 1);
-                        return baseId === parentId;
-
+                        return baseId === filterBaseId.substring(0, filterBaseId.length - 1);
                     case 'children':
-                        // Only one digit longer than the parent ID
                         return baseId.startsWith(filterBaseId) && baseId.length === filterBaseId.length + 1;
-
-                    case 'branch':
                     default:
-                        // Standard hierarchical branch view
                         return p.id.startsWith(filterFromId);
                 }
             });
 
             if (searchTerm || relFilterMode !== 'branch') {
-                // Flat view for search and strict relationship lists
                 filteredData.sort((a,b) => a.id.localeCompare(b.id));
                 filteredData.forEach(p => listContainer.appendChild(createPersonItem(p)));
             } else {
-                // Hierarchical Build
                 const sortedData = [...filteredData].sort((a, b) => a.id.length - b.id.length || a.id.localeCompare(b.id));
                 if (sortedData.length > 0) {
                     const minLen = sortedData[0].id.length;
@@ -336,22 +330,17 @@
                 const details = document.createElement('details');
                 details.className = "group";
                 details.open = person.id.length < 7;
-
                 const summary = document.createElement('summary');
                 summary.className = "flex items-center gap-2 p-2 hover:bg-gray-50 rounded-lg cursor-pointer transition";
-                summary.innerHTML = `
-                    <i data-lucide="chevron-right" class="w-4 h-4 text-gray-400 group-open:rotate-90"></i>
+                summary.innerHTML = `<i data-lucide="chevron-right" class="w-4 h-4 text-gray-400 group-open:rotate-90"></i>
                     <span class="font-medium text-gray-800">${person.name}</span>
                     <span class="text-[10px] text-gray-400 font-mono ml-auto">${person.id}</span>`;
                 summary.onclick = (e) => { if (!e.target.closest('i')) selectPerson(person); };
-
                 const childBox = document.createElement('div');
                 childBox.className = "henry-indent mt-1 space-y-1";
-                
                 details.appendChild(summary);
                 details.appendChild(childBox);
                 container.appendChild(details);
-
                 spouses.forEach(s => childBox.appendChild(createPersonItem(s)));
                 children.forEach(c => buildTreeNode(c, allData, childBox));
             } else {
@@ -375,10 +364,19 @@
             selectedPerson = p;
             if (window.innerWidth < 768) closeContact(false);
             
-            document.getElementById('empty-state').classList.add('hidden');
-            document.getElementById('contact-card').classList.remove('hidden');
+            const card = document.getElementById('contact-card');
+            const hero = document.getElementById('card-hero');
+            const empty = document.getElementById('empty-state');
+            
+            empty.classList.add('hidden');
+            card.classList.remove('hidden');
+            
+            // Random color for hero
+            const colorClass = COLORS[Math.floor(Math.random() * COLORS.length)];
+            hero.className = `p-8 text-white relative transition-colors duration-500 ${colorClass}`;
+
             document.getElementById('card-name').textContent = p.name;
-            document.getElementById('card-id').textContent = `ID: ${p.id}`;
+            document.getElementById('card-id').textContent = p.id;
             document.getElementById('card-birthday').querySelector('span').textContent = p.birthday || "Not listed";
             document.getElementById('card-phone').textContent = p.phone || "Not listed";
             document.getElementById('card-phone-link').href = `tel:${p.phone}`;
@@ -396,7 +394,6 @@
 
             renderBreadcrumbs(p);
 
-            // Spouse Logic
             const spouseSection = document.getElementById('spouse-section');
             const baseId = p.id.includes('s') ? p.id.split('s')[0] : p.id;
             const spouseId = p.id.includes('s') ? baseId : baseId + 's';
@@ -409,44 +406,67 @@
             } else {
                 spouseSection.classList.add('hidden');
             }
-
-            document.getElementById('avatar-initial').textContent = p.name.split(' ').map(n => n[0]).join('').substring(0,2);
             lucide.createIcons();
         }
 
-        function renderBreadcrumbs(person) {
+        function renderBreadcrumbs(person, showFull = false) {
             const container = document.getElementById('card-breadcrumbs');
             container.innerHTML = "";
             const baseId = person.id.includes('s') ? person.id.split('s')[0] : person.id;
-            const ids = [];
-            for (let i = 1; i <= baseId.length; i++) ids.push(baseId.substring(0, i));
+            const ancestors = [];
+            for (let i = 1; i < baseId.length; i++) {
+                const ancestor = familyData.find(f => f.id === baseId.substring(0, i));
+                if (ancestor) ancestors.push(ancestor);
+            }
 
-            ids.forEach((id, index) => {
-                const ancestor = familyData.find(f => f.id === id);
-                if (ancestor) {
-                    const chip = document.createElement('button');
-                    chip.className = "breadcrumb-chip";
-                    chip.textContent = ancestor.name;
-                    chip.onclick = () => selectPerson(ancestor);
-                    container.appendChild(chip);
-                    if (index < ids.length - 1) {
-                        const arrow = document.createElement('i');
-                        arrow.setAttribute('data-lucide', 'chevron-right');
-                        arrow.className = "w-3 h-3 text-gray-300";
-                        container.appendChild(arrow);
-                    }
-                }
+            let displayAncestors = ancestors;
+            const threshold = 2;
+
+            if (!showFull && ancestors.length > threshold) {
+                // "Show all" chip
+                const allChip = document.createElement('button');
+                allChip.className = "breadcrumb-chip";
+                allChip.textContent = "Show all";
+                allChip.onclick = (e) => {
+                    e.stopPropagation();
+                    renderBreadcrumbs(person, true);
+                };
+                container.appendChild(allChip);
+                container.appendChild(createArrow());
+                
+                // Show only last 2
+                displayAncestors = ancestors.slice(-threshold);
+            }
+
+            displayAncestors.forEach((ancestor, index) => {
+                const chip = document.createElement('button');
+                chip.className = "breadcrumb-chip";
+                chip.textContent = ancestor.name;
+                chip.onclick = () => selectPerson(ancestor);
+                container.appendChild(chip);
+                container.appendChild(createArrow());
             });
+
+            // Current Person (Plain Text)
+            const currentName = document.createElement('span');
+            currentName.className = "text-xs font-bold opacity-90";
+            currentName.textContent = person.name;
+            container.appendChild(currentName);
             lucide.createIcons();
+        }
+
+        function createArrow() {
+            const arrow = document.createElement('i');
+            arrow.setAttribute('data-lucide', 'chevron-right');
+            arrow.className = "w-3 h-3 text-white opacity-40";
+            return arrow;
         }
 
         function jumpToRel(type) {
             if (!selectedPerson) return;
             let baseId = selectedPerson.id.includes('s') ? selectedPerson.id.split('s')[0] : selectedPerson.id;
-            
             filterFromId = baseId;
-            relFilterMode = type; // 'siblings', 'children', or 'parents'
-
+            relFilterMode = type;
             document.getElementById('filter-from-input').value = baseId;
             renderDirectory();
             if (window.innerWidth < 768) closeContact(true);
@@ -466,26 +486,22 @@
 
         function handleSearch() { renderDirectory(document.getElementById('search-input').value.trim()); }
         function toggleFilters() { document.getElementById('filter-modal').classList.toggle('hidden'); }
-        
         function applyFilters() { 
             filterFromId = document.getElementById('filter-from-input').value.trim();
-            relFilterMode = "branch"; // Manual entry resets to standard branch mode
+            relFilterMode = "branch";
             hideAncestors = document.getElementById('filter-ancestors').checked;
             toggleFilters(); 
             renderDirectory(); 
         }
-
         function clearFromFilter() { 
             document.getElementById('filter-from-input').value = ""; 
             filterFromId = ""; 
             relFilterMode = "branch";
             renderDirectory(); 
         }
-
         function updateFilterIndicator() { 
             document.getElementById('filter-indicator').classList.toggle('hidden', !filterFromId && hideAncestors); 
         }
-
         function toggleAncestorFilter() { hideAncestors = document.getElementById('filter-ancestors').checked; }
         function editOnGithub() { window.open("https://github.com/", '_blank'); }
         document.getElementById('password-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') checkPassword(); });
