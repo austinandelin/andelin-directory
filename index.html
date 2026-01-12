@@ -32,7 +32,6 @@
         }
         .breadcrumb-chip:hover { background-color: rgba(255, 255, 255, 0.3); }
         
-        /* Tooltip/Dropdown Style */
         .dropdown-menu {
             transform-origin: top right;
             transition: transform 0.1s ease-out, opacity 0.1s ease-out;
@@ -61,7 +60,6 @@
 
     <!-- MAIN APP INTERFACE -->
     <div id="app-interface" class="hidden h-screen flex flex-col">
-        <!-- Header -->
         <header class="h-16 bg-white border-b flex items-center justify-between px-4 lg:px-8 shrink-0 relative z-40">
             <div class="flex items-center gap-2">
                 <button id="mobile-back" onclick="closeContact(true)" class="md:hidden p-2 hover:bg-gray-100 rounded-full hidden">
@@ -83,7 +81,6 @@
                     <span id="filter-indicator" class="hidden absolute -top-1 -right-1 w-3 h-3 bg-blue-500 border-2 border-white rounded-full"></span>
                 </button>
 
-                <!-- Tools Dropdown -->
                 <div class="relative">
                     <button onclick="toggleTools(event)" class="p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition relative">
                         <i data-lucide="wrench" class="w-5 h-5 text-gray-600"></i>
@@ -99,7 +96,7 @@
                         </button>
                         <div class="border-t border-gray-100 my-1"></div>
                         <p class="px-3 py-1 text-[10px] uppercase font-bold text-gray-400 tracking-wider">Session</p>
-                        <button onclick="location.reload()" class="flex items-center gap-3 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition">
+                        <button onclick="logout()" class="flex items-center gap-3 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition">
                             <i data-lucide="log-out" class="w-4 h-4"></i>
                             Logout
                         </button>
@@ -108,16 +105,13 @@
             </div>
         </header>
 
-        <!-- Main Body -->
         <main class="flex-1 flex overflow-hidden">
             <aside id="sidebar" class="w-full md:w-96 bg-white border-r overflow-y-auto sidebar-height">
-                <!-- Search bar for mobile -->
                 <div class="p-4 md:hidden border-b">
                     <input type="text" id="search-input-mobile" onkeyup="handleSearch('mobile')" placeholder="Search anyone or any detail..." 
                            class="w-full px-4 py-2 border rounded-lg bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
                 
-                <!-- Relationship Filter Alert -->
                 <div id="rel-filter-alert" class="hidden m-2 p-3 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-between">
                     <div class="flex items-center gap-2 text-blue-700">
                         <i data-lucide="info" class="w-4 h-4"></i>
@@ -133,7 +127,6 @@
                 </div>
             </aside>
 
-            <!-- Content Area (Contact Card) -->
             <section id="contact-panel" class="flex-1 bg-gray-50 overflow-y-auto content-height mobile-hidden p-6 lg:p-12">
                 <div id="empty-state" class="h-full flex flex-col items-center justify-center text-gray-400">
                     <i data-lucide="user" class="w-16 h-16 mb-4 opacity-20"></i>
@@ -141,20 +134,15 @@
                 </div>
 
                 <div id="contact-card" class="hidden max-w-2xl mx-auto bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                    <!-- Hero Section with Name, ID, Breadcrumbs -->
                     <div id="card-hero" class="p-8 text-white relative transition-colors duration-500">
-                        <!-- Henry ID in top right -->
                         <div class="absolute top-6 right-8 text-right">
                             <label class="block text-[10px] font-bold uppercase tracking-widest opacity-70">Henry ID</label>
                             <p id="card-id" class="font-mono font-bold text-sm">11132</p>
                         </div>
 
-                        <!-- Name & Breadcrumbs -->
                         <div class="max-w-[calc(100%-120px)]">
                             <h2 id="card-name" class="text-3xl font-bold leading-tight">John Doe</h2>
-                            <div id="card-breadcrumbs" class="flex flex-wrap items-center gap-2 mt-4">
-                                <!-- Chips generated here -->
-                            </div>
+                            <div id="card-breadcrumbs" class="flex flex-wrap items-center gap-2 mt-4"></div>
                         </div>
                     </div>
                     
@@ -165,7 +153,6 @@
                             </button>
                         </div>
 
-                        <!-- Relationship Shortcut Buttons -->
                         <div class="flex flex-wrap gap-2 mt-4 p-1 bg-gray-50 rounded-xl border border-gray-100">
                             <button onclick="jumpToRel('parents')" class="flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg hover:bg-white hover:shadow-sm text-xs font-semibold text-gray-600 transition">
                                 <i data-lucide="users" class="w-4 h-4"></i> Show Parents
@@ -229,7 +216,7 @@
             </section>
         </main>
 
-        <!-- Filter Modal -->
+        <!-- Modals -->
         <div id="filter-modal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hidden p-4">
             <div class="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl">
                 <div class="flex justify-between items-center mb-6">
@@ -256,20 +243,32 @@
                 </div>
             </div>
         </div>
+
+        <div id="export-modal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hidden p-4">
+            <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center">
+                <div class="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i data-lucide="calendar" class="w-8 h-8"></i>
+                </div>
+                <h3 class="text-xl font-bold text-gray-900 mb-2">Export Birthdays</h3>
+                <p class="text-sm text-gray-500 mb-8">This will export the birthdays of only currently visible contacts.</p>
+                <div class="flex gap-3">
+                    <button onclick="toggleExportModal()" class="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition">Cancel</button>
+                    <button onclick="confirmExport()" class="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition shadow-lg shadow-emerald-200">Export .ics</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
         let familyData = []; 
-        let lastFilteredData = []; // Store current view for exports
+        let lastFilteredData = [];
         const FAMILY_PASSWORD = "sillygoose"; 
         
-        // Filter States
         let hideAncestors = true;
         let filterFromId = "";
         let relFilterMode = "branch";
         let selectedPerson = null;
 
-        // Visual Palette
         const COLORS = [
             'bg-blue-600', 'bg-indigo-600', 'bg-emerald-600', 
             'bg-rose-600', 'bg-amber-600', 'bg-violet-600', 'bg-teal-600'
@@ -278,6 +277,7 @@
         function checkPassword() {
             const input = document.getElementById('password-input').value;
             if (input === FAMILY_PASSWORD) {
+                sessionStorage.setItem('family_auth', 'true');
                 document.getElementById('login-screen').classList.add('hidden');
                 document.getElementById('app-interface').classList.remove('hidden');
                 initApp();
@@ -286,34 +286,55 @@
             }
         }
 
+        function logout() {
+            sessionStorage.removeItem('family_auth');
+            location.reload();
+        }
+
+        window.onload = function() {
+            if (sessionStorage.getItem('family_auth') === 'true') {
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('app-interface').classList.remove('hidden');
+                initApp();
+            }
+        };
+
         async function initApp() {
             const listContainer = document.getElementById('directory-list');
             try {
                 const response = await fetch('family.json', { cache: "no-store" });
-                if (!response.ok) throw new Error(`HTTP Error ${response.status}: ${response.statusText}`);
-                const text = await response.text();
-                familyData = JSON.parse(text);
+                familyData = await response.json();
                 renderDirectory();
+                startBackgroundGeocoding();
             } catch (err) {
                 console.error("Data load error:", err);
-                listContainer.innerHTML = `<div class="p-6 text-center text-red-500"><p class="font-bold">Error loading family.json</p><p class="text-xs mt-2 font-mono">${err.message}</p></div>`;
+                listContainer.innerHTML = `<div class="p-6 text-center text-red-500"><p class="font-bold">Error loading family.json</p></div>`;
             }
             lucide.createIcons();
+        }
+
+        async function startBackgroundGeocoding() {
+            const cache = JSON.parse(localStorage.getItem('family_geo_cache') || '{}');
+            const toGeocode = familyData.filter(p => p.address && !cache[p.address]);
+            for (const person of toGeocode) {
+                if (cache[person.address]) continue;
+                try {
+                    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(person.address)}&limit=1`;
+                    const res = await fetch(url, { headers: { 'User-Agent': 'FamilyDirPlotter' } });
+                    const data = await res.json();
+                    if (data && data.length > 0) {
+                        cache[person.address] = { lat: data[0].lat, lon: data[0].lon };
+                        localStorage.setItem('family_geo_cache', JSON.stringify(cache));
+                    }
+                } catch (e) {}
+                await new Promise(r => setTimeout(r, 1200));
+            }
         }
 
         function renderDirectory(searchTerm = "") {
             const listContainer = document.getElementById('directory-list');
             listContainer.innerHTML = "";
             if (!familyData || !familyData.length) return;
-
-            const alertBox = document.getElementById('rel-filter-alert');
-            const alertText = document.getElementById('rel-filter-text');
-            if (filterFromId && relFilterMode !== 'branch') {
-                alertBox.classList.remove('hidden');
-                alertText.textContent = `Showing ${relFilterMode}`;
-            } else {
-                alertBox.classList.add('hidden');
-            }
 
             const lowerSearch = searchTerm.toLowerCase();
 
@@ -323,7 +344,6 @@
                 );
                 
                 if (searchTerm) return matchesSearch;
-
                 if (!filterFromId) {
                     const isAncestral = p.id.length < 5 && !p.id.includes('s');
                     return hideAncestors ? !isAncestral : true;
@@ -372,7 +392,6 @@
                 details.open = person.id.length < 7;
                 
                 const summary = document.createElement('summary');
-                // Split targets: Chevron for toggle, Name for select
                 summary.className = "flex items-center hover:bg-gray-50 rounded-lg cursor-pointer transition w-full group/sum";
                 summary.innerHTML = `
                     <div class="p-2 -mr-1 hover:bg-gray-200 rounded-l-lg transition-colors flex items-center justify-center chevron-toggle">
@@ -385,9 +404,8 @@
                 `;
                 
                 summary.onclick = (e) => {
-                    const isNameTarget = e.target.closest('.name-select');
-                    if (isNameTarget) {
-                        e.preventDefault(); // Stop details toggle
+                    if (e.target.closest('.name-select')) {
+                        e.preventDefault();
                         selectPerson(person);
                     }
                 };
@@ -397,7 +415,6 @@
                 details.appendChild(summary);
                 details.appendChild(childBox);
                 container.appendChild(details);
-                
                 spouses.forEach(s => childBox.appendChild(createPersonItem(s)));
                 children.forEach(c => buildTreeNode(c, allData, childBox));
             } else {
@@ -420,19 +437,13 @@
         function selectPerson(p) {
             selectedPerson = p;
             if (window.innerWidth < 768) closeContact(false);
-            
             const card = document.getElementById('contact-card');
             const hero = document.getElementById('card-hero');
             const empty = document.getElementById('empty-state');
-            
             empty.classList.add('hidden');
             card.classList.remove('hidden');
-            
-            // Fixed color per person based on ID hash for consistency
             const colorIdx = p.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % COLORS.length;
-            const colorClass = COLORS[colorIdx];
-            hero.className = `p-8 text-white relative transition-colors duration-500 ${colorClass}`;
-
+            hero.className = `p-8 text-white relative transition-colors duration-500 ${COLORS[colorIdx]}`;
             document.getElementById('card-name').textContent = p.name;
             document.getElementById('card-id').textContent = p.id;
             document.getElementById('card-birthday').querySelector('span').textContent = p.birthday || "Not listed";
@@ -441,22 +452,17 @@
             document.getElementById('card-email').textContent = p.email || "Not listed";
             document.getElementById('card-email-link').href = p.email ? `mailto:${p.email}` : "#";
             document.getElementById('card-address').textContent = p.address || "Not listed";
-            
             const mapLink = document.getElementById('card-map-link');
             if (p.address) {
                 mapLink.classList.remove('hidden');
                 mapLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.address)}`;
             } else mapLink.classList.add('hidden');
-            
             document.getElementById('card-updated').textContent = p.updated || "Not listed";
-
             renderBreadcrumbs(p);
-
             const spouseSection = document.getElementById('spouse-section');
             const baseId = p.id.includes('s') ? p.id.split('s')[0] : p.id;
             const spouseId = p.id.includes('s') ? baseId : baseId + 's';
             const spouse = familyData.find(f => f.id === spouseId || f.id === spouseId + '1'); 
-            
             if (spouse) {
                 spouseSection.classList.remove('hidden');
                 document.getElementById('card-spouse-name').textContent = spouse.name;
@@ -476,23 +482,16 @@
                 const ancestor = familyData.find(f => f.id === baseId.substring(0, i));
                 if (ancestor) ancestors.push(ancestor);
             }
-
             let displayAncestors = ancestors;
-            const threshold = 2;
-
-            if (!showFull && ancestors.length > threshold) {
+            if (!showFull && ancestors.length > 2) {
                 const allChip = document.createElement('button');
                 allChip.className = "breadcrumb-chip";
                 allChip.textContent = "Show all";
-                allChip.onclick = (e) => {
-                    e.stopPropagation();
-                    renderBreadcrumbs(person, true);
-                };
+                allChip.onclick = (e) => { e.stopPropagation(); renderBreadcrumbs(person, true); };
                 container.appendChild(allChip);
                 container.appendChild(createArrow());
-                displayAncestors = ancestors.slice(-threshold);
+                displayAncestors = ancestors.slice(-2);
             }
-
             displayAncestors.forEach((ancestor, index) => {
                 const chip = document.createElement('button');
                 chip.className = "breadcrumb-chip";
@@ -501,7 +500,6 @@
                 container.appendChild(chip);
                 container.appendChild(createArrow());
             });
-
             const currentName = document.createElement('span');
             currentName.className = "text-xs font-bold opacity-90";
             currentName.textContent = person.name;
@@ -516,43 +514,36 @@
             return arrow;
         }
 
-        // --- TOOLS ---
         function toggleTools(e) {
             e.stopPropagation();
-            const dropdown = document.getElementById('tools-dropdown');
-            dropdown.classList.toggle('dropdown-hidden');
+            document.getElementById('tools-dropdown').classList.toggle('dropdown-hidden');
         }
 
         function closeDropdowns(e) {
-            const dropdown = document.getElementById('tools-dropdown');
             if (!e.target.closest('.dropdown-menu') && !e.target.closest('button')) {
-                dropdown.classList.add('dropdown-hidden');
+                document.getElementById('tools-dropdown').classList.add('dropdown-hidden');
             }
         }
 
         function exportBirthdaysICS() {
             if (!lastFilteredData || lastFilteredData.length === 0) return;
-            
+            toggleExportModal();
+        }
+
+        function toggleExportModal() {
+            const modal = document.getElementById('export-modal');
+            modal.classList.toggle('hidden');
+            if (!modal.classList.contains('hidden')) lucide.createIcons();
+        }
+
+        function confirmExport() {
             const events = lastFilteredData
                 .filter(p => p.birthday && p.birthday.includes('-'))
                 .map(p => {
                     const cleanBday = p.birthday.replace(/-/g, '');
-                    return `BEGIN:VEVENT
-SUMMARY:Birthday - ${p.name}
-DTSTART;VALUE=DATE:${cleanBday}
-RRULE:FREQ=YEARLY
-TRANSP:TRANSPARENT
-END:VEVENT`;
+                    return `BEGIN:VEVENT\nSUMMARY:Birthday - ${p.name}\nDTSTART;VALUE=DATE:${cleanBday}\nRRULE:FREQ=YEARLY\nTRANSP:TRANSPARENT\nEND:VEVENT`;
                 });
-
-            if (events.length === 0) return;
-
-            const icsContent = `BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//Family Directory//Birthday Calendar//EN
-${events.join('\n')}
-END:VCALENDAR`;
-
+            const icsContent = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Family Directory//EN\n${events.join('\n')}\nEND:VCALENDAR`;
             const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
@@ -561,6 +552,7 @@ END:VCALENDAR`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            toggleExportModal();
         }
 
         function jumpToRel(type) {
@@ -609,7 +601,6 @@ END:VCALENDAR`;
         }
         function toggleAncestorFilter() { hideAncestors = document.getElementById('filter-ancestors').checked; }
         function editOnGithub() { window.open("https://github.com/", '_blank'); }
-        document.getElementById('password-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') checkPassword(); });
     </script>
 </body>
 </html>
