@@ -10,30 +10,54 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
-        #map { height: calc(100vh - 64px); width: 100%; z-index: 1; }
+        #map { height: 100%; width: 100%; z-index: 1; }
         .custom-popup .leaflet-popup-content-wrapper { border-radius: 12px; padding: 8px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
-        .custom-popup .leaflet-popup-content { margin: 8px; width: auto !important; min-width: 200px; }
+        .custom-popup .leaflet-popup-content { margin: 8px; width: auto !important; min-width: 240px; }
         .loading-overlay { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(4px); }
+        .sidebar-height { height: calc(100vh - 64px); }
     </style>
 </head>
 <body class="bg-gray-50 overflow-hidden">
 
-    <header class="h-16 bg-white border-b flex items-center justify-between px-6 z-10 relative shadow-sm">
+    <header class="h-16 bg-white border-b flex items-center justify-between px-6 z-30 relative shadow-sm">
         <div class="flex items-center gap-4">
             <a href="index.html" class="p-2 hover:bg-gray-100 rounded-full transition">
-                <i data-lucide="arrow-left" class="w-5 h-5"></i>
+                <i data-lucide="arrow-left" class="w-5 h-5 text-slate-600"></i>
             </a>
             <h1 class="font-bold text-xl">Family Map</h1>
         </div>
-        <div id="status-text" class="text-sm text-gray-500 font-medium tracking-tight">Initializing...</div>
+        <div class="flex items-center gap-4">
+            <div id="status-text" class="text-sm text-gray-500 font-medium tracking-tight">Initializing...</div>
+            <button onclick="toggleErrorSidebar()" id="error-toggle" class="hidden flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold border border-amber-100 hover:bg-amber-100 transition">
+                <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                <span id="error-count">0</span> Issues
+            </button>
+        </div>
     </header>
 
-    <main class="relative">
-        <div id="map"></div>
-        <div id="loader" class="loading-overlay absolute inset-0 z-20 flex flex-col items-center justify-center">
-            <div class="w-12 h-12 border-4 border-slate-900 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p class="font-bold text-slate-900 text-lg">Loading Map Data...</p>
-            <p id="progress-text" class="text-sm text-gray-500 mt-2">Checking cached locations...</p>
+    <main class="relative flex overflow-hidden sidebar-height">
+        <!-- Sidebar for Failed Addresses -->
+        <aside id="error-sidebar" class="hidden w-80 bg-white border-r overflow-y-auto shrink-0 transition-all duration-300">
+            <div class="p-4 border-b bg-gray-50 flex items-center justify-between sticky top-0">
+                <h2 class="font-bold text-sm text-slate-800">Unmapped Locations</h2>
+                <button onclick="toggleErrorSidebar()" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+            <div id="error-list" class="p-4 space-y-4">
+                <!-- Failed items injected here -->
+            </div>
+        </aside>
+
+        <!-- Map Container -->
+        <div class="flex-1 relative">
+            <div id="map"></div>
+            
+            <div id="loader" class="loading-overlay absolute inset-0 z-20 flex flex-col items-center justify-center">
+                <div class="w-12 h-12 border-4 border-slate-900 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p class="font-bold text-slate-900 text-lg">Loading Map Data...</p>
+                <p id="progress-text" class="text-sm text-gray-500 mt-2">Checking cached locations...</p>
+            </div>
         </div>
     </main>
 
@@ -42,6 +66,7 @@
         let map;
         let familyData = [];
         const markers = [];
+        const failedAddresses = [];
 
         // --- AUTH CHECK ---
         if (sessionStorage.getItem('family_auth') !== 'true') {
@@ -66,7 +91,6 @@
             const geocodedPeople = familyData.filter(p => p.address && p.address.trim() !== "");
             const geoCache = JSON.parse(localStorage.getItem('family_geo_cache') || '{}');
             
-            // Group people by shared address string
             const addressGroups = {};
             geocodedPeople.forEach(person => {
                 const addr = person.address.trim();
@@ -82,49 +106,90 @@
                 count++;
                 const people = addressGroups[addr];
                 
-                // Check Cache
                 const cachedCoords = geoCache[addr];
                 if (cachedCoords) {
                     addMarker(people, cachedCoords, addr);
-                    document.getElementById('progress-text').textContent = `Loaded cached address ${count} of ${total}`;
+                    document.getElementById('progress-text').textContent = `Loaded ${count} of ${total}`;
                     continue;
                 }
 
-                // Fallback to Geocoding
-                document.getElementById('progress-text').textContent = `Searching address ${count} of ${total}`;
+                document.getElementById('progress-text').textContent = `Searching ${count} of ${total}`;
                 try {
                     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}&limit=1`;
                     const res = await fetch(url, { headers: { 'User-Agent': 'FamilyDirPlotter' } });
                     const data = await res.json();
+                    
                     if (data && data.length > 0) {
                         const coords = { lat: data[0].lat, lon: data[0].lon };
                         addMarker(people, coords, addr);
                         geoCache[addr] = coords;
                         localStorage.setItem('family_geo_cache', JSON.stringify(geoCache));
+                    } else {
+                        failedAddresses.push({ address: addr, people: people });
                     }
-                } catch (e) {}
+                } catch (e) {
+                    failedAddresses.push({ address: addr, people: people });
+                }
 
                 await new Promise(r => setTimeout(r, 1200));
             }
 
+            renderErrors();
             document.getElementById('loader').classList.add('hidden');
             document.getElementById('status-text').textContent = `${markers.length} locations mapped`;
+            
             if (markers.length > 0) {
                 const group = new L.featureGroup(markers);
                 map.fitBounds(group.getBounds().pad(0.1));
             }
         }
 
+        function renderErrors() {
+            const errorList = document.getElementById('error-list');
+            const toggle = document.getElementById('error-toggle');
+            const countLabel = document.getElementById('error-count');
+
+            if (failedAddresses.length > 0) {
+                toggle.classList.remove('hidden');
+                countLabel.textContent = failedAddresses.length;
+                
+                errorList.innerHTML = failedAddresses.map(fail => `
+                    <div class="p-3 bg-white border border-gray-100 rounded-xl shadow-sm">
+                        <div class="flex items-start gap-3 mb-2">
+                            <i data-lucide="map-pin-off" class="w-4 h-4 text-amber-500 shrink-0 mt-0.5"></i>
+                            <p class="text-[11px] text-gray-500 font-medium leading-relaxed">${fail.address}</p>
+                        </div>
+                        <div class="space-y-1 pl-7">
+                            ${fail.people.map(p => `
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="text-xs font-bold text-slate-800">${p.name}</span>
+                                    <a href="index.html?id=${p.id}" class="text-[10px] bg-blue-600 text-white px-2 py-1 rounded font-bold hover:bg-blue-700 transition">View Profile</a>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `).join('');
+                lucide.createIcons();
+            }
+        }
+
+        function toggleErrorSidebar() {
+            const sidebar = document.getElementById('error-sidebar');
+            sidebar.classList.toggle('hidden');
+            setTimeout(() => { map.invalidateSize(); }, 300);
+        }
+
         function addMarker(people, coords, address) {
             const marker = L.marker([coords.lat, coords.lon]).addTo(map);
             
-            // Create a list of names for the popup
             const nameList = people.map(p => `
-                <div class="flex items-center justify-between gap-4 py-1.5 border-b border-gray-100 last:border-0">
+                <div class="flex items-center justify-between gap-4 py-2 border-b border-gray-100 last:border-0">
                     <div>
-                        <p class="font-bold text-slate-900">${p.name}</p>
-                        <p class="text-[10px] text-blue-600 font-mono">ID: ${p.id}</p>
+                        <p class="font-bold text-slate-900 text-sm">${p.name}</p>
                     </div>
+                    <a href="index.html?id=${p.id}" class="bg-blue-600 text-white px-3 py-1.5 rounded-md text-[10px] font-bold hover:bg-blue-700 transition shadow-sm whitespace-nowrap">
+                        View Profile
+                    </a>
                 </div>
             `).join('');
 
@@ -132,17 +197,15 @@
                 <div class="custom-popup">
                     <div class="mb-3">
                         <label class="text-[9px] font-bold uppercase tracking-widest text-gray-400 block mb-1">Address</label>
-                        <p class="text-xs text-gray-700 font-medium leading-relaxed">${address}</p>
+                        <p class="text-[11px] text-gray-600 font-medium leading-relaxed">${address}</p>
                     </div>
                     
-                    <div class="max-h-40 overflow-y-auto mb-4 bg-gray-50 rounded-lg p-2 border border-gray-100">
-                        <label class="text-[9px] font-bold uppercase tracking-widest text-gray-400 block mb-1">Residents</label>
-                        ${nameList}
+                    <div class="max-h-48 overflow-y-auto bg-gray-50 rounded-lg p-3 border border-gray-100">
+                        <label class="text-[9px] font-bold uppercase tracking-widest text-gray-400 block mb-2">Residents</label>
+                        <div class="space-y-1">
+                            ${nameList}
+                        </div>
                     </div>
-                    
-                    <a href="index.html" class="block w-full text-center bg-slate-900 text-white py-2.5 rounded-lg text-xs font-bold hover:bg-black transition-colors shadow-lg">
-                        View Directory Profile
-                    </a>
                 </div>`;
                 
             marker.bindPopup(popupContent);
