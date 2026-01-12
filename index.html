@@ -31,9 +31,20 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
         .breadcrumb-chip:hover { background-color: rgba(255, 255, 255, 0.3); }
+        
+        /* Tooltip/Dropdown Style */
+        .dropdown-menu {
+            transform-origin: top right;
+            transition: transform 0.1s ease-out, opacity 0.1s ease-out;
+        }
+        .dropdown-hidden {
+            transform: scale(0.95);
+            opacity: 0;
+            pointer-events: none;
+        }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-900 overflow-hidden">
+<body class="bg-gray-50 text-gray-900 overflow-hidden" onclick="closeDropdowns(event)">
 
     <!-- LOGIN INTERFACE -->
     <div id="login-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-100">
@@ -51,7 +62,7 @@
     <!-- MAIN APP INTERFACE -->
     <div id="app-interface" class="hidden h-screen flex flex-col">
         <!-- Header -->
-        <header class="h-16 bg-white border-b flex items-center justify-between px-4 lg:px-8 shrink-0">
+        <header class="h-16 bg-white border-b flex items-center justify-between px-4 lg:px-8 shrink-0 relative z-40">
             <div class="flex items-center gap-2">
                 <button id="mobile-back" onclick="closeContact(true)" class="md:hidden p-2 hover:bg-gray-100 rounded-full hidden">
                     <i data-lucide="arrow-left"></i>
@@ -59,17 +70,41 @@
                 <h1 class="font-bold text-xl">Family Directory</h1>
             </div>
             
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2">
                 <div class="relative hidden md:block">
-                    <input type="text" id="search-input" onkeyup="handleSearch()" placeholder="Search anyone or any detail..." 
+                    <input type="text" id="search-input" onkeyup="handleSearch('desktop')" placeholder="Search anyone or any detail..." 
                            class="pl-10 pr-4 py-2 border rounded-full text-sm w-64 focus:ring-2 focus:ring-blue-500 outline-none">
                     <i data-lucide="search" class="absolute left-3 top-2.5 w-4 h-4 text-gray-400"></i>
                 </div>
+                
                 <button onclick="toggleFilters()" class="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-full text-sm font-medium transition relative">
                     <i data-lucide="filter" class="w-4 h-4"></i>
-                    <span>Filters</span>
+                    <span class="hidden sm:inline">Filters</span>
                     <span id="filter-indicator" class="hidden absolute -top-1 -right-1 w-3 h-3 bg-blue-500 border-2 border-white rounded-full"></span>
                 </button>
+
+                <!-- Tools Dropdown -->
+                <div class="relative">
+                    <button onclick="toggleTools(event)" class="p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition relative">
+                        <i data-lucide="wrench" class="w-5 h-5 text-gray-600"></i>
+                    </button>
+                    <div id="tools-dropdown" class="dropdown-menu dropdown-hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 p-2 z-50">
+                        <a href="maps.html" class="flex items-center gap-3 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition">
+                            <i data-lucide="map" class="w-4 h-4 text-blue-500"></i>
+                            View Family Map
+                        </a>
+                        <button onclick="exportBirthdaysICS()" class="flex items-center gap-3 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition">
+                            <i data-lucide="calendar" class="w-4 h-4 text-emerald-500"></i>
+                            Export Birthdays (.ics)
+                        </button>
+                        <div class="border-t border-gray-100 my-1"></div>
+                        <p class="px-3 py-1 text-[10px] uppercase font-bold text-gray-400 tracking-wider">Session</p>
+                        <button onclick="location.reload()" class="flex items-center gap-3 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition">
+                            <i data-lucide="log-out" class="w-4 h-4"></i>
+                            Logout
+                        </button>
+                    </div>
+                </div>
             </div>
         </header>
 
@@ -78,8 +113,8 @@
             <aside id="sidebar" class="w-full md:w-96 bg-white border-r overflow-y-auto sidebar-height">
                 <!-- Search bar for mobile -->
                 <div class="p-4 md:hidden border-b">
-                    <input type="text" onkeyup="handleSearch()" placeholder="Search anyone or any detail..." 
-                           class="w-full px-4 py-2 border rounded-lg bg-gray-50">
+                    <input type="text" id="search-input-mobile" onkeyup="handleSearch('mobile')" placeholder="Search anyone or any detail..." 
+                           class="w-full px-4 py-2 border rounded-lg bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
                 
                 <!-- Relationship Filter Alert -->
@@ -188,7 +223,6 @@
 
                         <div class="mt-12 pt-8 border-t border-gray-50 flex items-center justify-between text-gray-400 text-xs italic">
                             <span>Last verified: <span id="card-updated">Not listed</span></span>
-                            <!-- Removed Henry System ID label -->
                         </div>
                     </div>
                 </div>
@@ -226,6 +260,7 @@
 
     <script>
         let familyData = []; 
+        let lastFilteredData = []; // Store current view for exports
         const FAMILY_PASSWORD = "sillygoose"; 
         
         // Filter States
@@ -282,8 +317,7 @@
 
             const lowerSearch = searchTerm.toLowerCase();
 
-            const filteredData = familyData.filter(p => {
-                // Expanded search: checks every field in the object
+            lastFilteredData = familyData.filter(p => {
                 const matchesSearch = Object.values(p).some(val => 
                     val && val.toString().toLowerCase().includes(lowerSearch)
                 );
@@ -313,14 +347,14 @@
             });
 
             if (searchTerm || relFilterMode !== 'branch') {
-                filteredData.sort((a,b) => a.id.localeCompare(b.id));
-                filteredData.forEach(p => listContainer.appendChild(createPersonItem(p)));
+                lastFilteredData.sort((a,b) => a.id.localeCompare(b.id));
+                lastFilteredData.forEach(p => listContainer.appendChild(createPersonItem(p)));
             } else {
-                const sortedData = [...filteredData].sort((a, b) => a.id.length - b.id.length || a.id.localeCompare(b.id));
+                const sortedData = [...lastFilteredData].sort((a, b) => a.id.length - b.id.length || a.id.localeCompare(b.id));
                 if (sortedData.length > 0) {
                     const minLen = sortedData[0].id.length;
                     const rootNodes = sortedData.filter(p => p.id.length === minLen);
-                    rootNodes.forEach(node => buildTreeNode(node, filteredData, listContainer));
+                    rootNodes.forEach(node => buildTreeNode(node, lastFilteredData, listContainer));
                 }
             }
             updateFilterIndicator();
@@ -336,17 +370,34 @@
                 const details = document.createElement('details');
                 details.className = "group";
                 details.open = person.id.length < 7;
+                
                 const summary = document.createElement('summary');
-                summary.className = "flex items-center gap-2 p-2 hover:bg-gray-50 rounded-lg cursor-pointer transition";
-                summary.innerHTML = `<i data-lucide="chevron-right" class="w-4 h-4 text-gray-400 group-open:rotate-90"></i>
-                    <span class="font-medium text-gray-800">${person.name}</span>
-                    <span class="text-[10px] text-gray-400 font-mono ml-auto">${person.id}</span>`;
-                summary.onclick = (e) => { if (!e.target.closest('i')) selectPerson(person); };
+                // Split targets: Chevron for toggle, Name for select
+                summary.className = "flex items-center hover:bg-gray-50 rounded-lg cursor-pointer transition w-full group/sum";
+                summary.innerHTML = `
+                    <div class="p-2 -mr-1 hover:bg-gray-200 rounded-l-lg transition-colors flex items-center justify-center chevron-toggle">
+                        <i data-lucide="chevron-right" class="w-4 h-4 text-gray-400 group-open:rotate-90"></i>
+                    </div>
+                    <div class="flex-1 py-2 px-1 flex items-center justify-between name-select">
+                        <span class="font-medium text-gray-800">${person.name}</span>
+                        <span class="text-[10px] text-gray-400 font-mono ml-auto opacity-0 group-hover/sum:opacity-100 transition-opacity">${person.id}</span>
+                    </div>
+                `;
+                
+                summary.onclick = (e) => {
+                    const isNameTarget = e.target.closest('.name-select');
+                    if (isNameTarget) {
+                        e.preventDefault(); // Stop details toggle
+                        selectPerson(person);
+                    }
+                };
+
                 const childBox = document.createElement('div');
                 childBox.className = "henry-indent mt-1 space-y-1";
                 details.appendChild(summary);
                 details.appendChild(childBox);
                 container.appendChild(details);
+                
                 spouses.forEach(s => childBox.appendChild(createPersonItem(s)));
                 children.forEach(c => buildTreeNode(c, allData, childBox));
             } else {
@@ -357,7 +408,7 @@
         function createPersonItem(p) {
             const isSpouse = p.id.includes('s');
             const div = document.createElement('div');
-            div.className = "flex items-center justify-between p-2 hover:bg-blue-50 hover:text-blue-700 rounded-lg cursor-pointer group transition";
+            div.className = "flex items-center justify-between p-2 pl-6 hover:bg-blue-50 hover:text-blue-700 rounded-lg cursor-pointer group transition";
             div.innerHTML = `<div class="flex items-center gap-2">
                 <i data-lucide="${isSpouse ? 'link' : 'user'}" class="w-3 h-3 ${isSpouse ? 'text-pink-400' : 'text-gray-300'}"></i>
                 <span class="text-sm font-medium">${p.name}</span>
@@ -377,8 +428,9 @@
             empty.classList.add('hidden');
             card.classList.remove('hidden');
             
-            // Random color for hero
-            const colorClass = COLORS[Math.floor(Math.random() * COLORS.length)];
+            // Fixed color per person based on ID hash for consistency
+            const colorIdx = p.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % COLORS.length;
+            const colorClass = COLORS[colorIdx];
             hero.className = `p-8 text-white relative transition-colors duration-500 ${colorClass}`;
 
             document.getElementById('card-name').textContent = p.name;
@@ -429,7 +481,6 @@
             const threshold = 2;
 
             if (!showFull && ancestors.length > threshold) {
-                // "Show all" chip
                 const allChip = document.createElement('button');
                 allChip.className = "breadcrumb-chip";
                 allChip.textContent = "Show all";
@@ -439,8 +490,6 @@
                 };
                 container.appendChild(allChip);
                 container.appendChild(createArrow());
-                
-                // Show only last 2
                 displayAncestors = ancestors.slice(-threshold);
             }
 
@@ -453,7 +502,6 @@
                 container.appendChild(createArrow());
             });
 
-            // Current Person (Plain Text)
             const currentName = document.createElement('span');
             currentName.className = "text-xs font-bold opacity-90";
             currentName.textContent = person.name;
@@ -466,6 +514,53 @@
             arrow.setAttribute('data-lucide', 'chevron-right');
             arrow.className = "w-3 h-3 text-white opacity-40";
             return arrow;
+        }
+
+        // --- TOOLS ---
+        function toggleTools(e) {
+            e.stopPropagation();
+            const dropdown = document.getElementById('tools-dropdown');
+            dropdown.classList.toggle('dropdown-hidden');
+        }
+
+        function closeDropdowns(e) {
+            const dropdown = document.getElementById('tools-dropdown');
+            if (!e.target.closest('.dropdown-menu') && !e.target.closest('button')) {
+                dropdown.classList.add('dropdown-hidden');
+            }
+        }
+
+        function exportBirthdaysICS() {
+            if (!lastFilteredData || lastFilteredData.length === 0) return;
+            
+            const events = lastFilteredData
+                .filter(p => p.birthday && p.birthday.includes('-'))
+                .map(p => {
+                    const cleanBday = p.birthday.replace(/-/g, '');
+                    return `BEGIN:VEVENT
+SUMMARY:Birthday - ${p.name}
+DTSTART;VALUE=DATE:${cleanBday}
+RRULE:FREQ=YEARLY
+TRANSP:TRANSPARENT
+END:VEVENT`;
+                });
+
+            if (events.length === 0) return;
+
+            const icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Family Directory//Birthday Calendar//EN
+${events.join('\n')}
+END:VCALENDAR`;
+
+            const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'family_birthdays.ics');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         function jumpToRel(type) {
@@ -490,7 +585,11 @@
             }
         }
 
-        function handleSearch() { renderDirectory(document.getElementById('search-input').value.trim()); }
+        function handleSearch(source) { 
+            const val = source === 'mobile' ? document.getElementById('search-input-mobile').value : document.getElementById('search-input').value;
+            renderDirectory(val.trim()); 
+        }
+
         function toggleFilters() { document.getElementById('filter-modal').classList.toggle('hidden'); }
         function applyFilters() { 
             filterFromId = document.getElementById('filter-from-input').value.trim();
