@@ -48,6 +48,22 @@
     "updated": "2026-01-11"
   },
   {
+    "id": "113122",
+    "name": "Weston Andelin",
+    "birthday": "1978-03-19",
+    "phone": "",
+    "address": "",
+    "updated": "2026-01-11"
+  },
+  {
+    "id": "1131221",
+    "name": "Spencer Andelin",
+    "birthday": "2002-10-21",
+    "phone": "",
+    "address": "",
+    "updated": "2026-01-11"
+  },
+  {
     "id": "113121s",
     "name": "Natalie Andelin",
     "birthday": "1978-07-10",
@@ -67,7 +83,15 @@
     "id": "1131211s",
     "name": "Melanie Andelin",
     "birthday": "2000-10-11",
-    "phone": "+801-369-5977",
+    "phone": "801-369-5977",
+    "address": "550 Pamlar Ave B, San Jose, CA 95128",
+    "updated": "2026-01-11"
+  },
+  {
+    "id": "11312111",
+    "name": "Baby Andelin",
+    "birthday": "",
+    "phone": "",
     "address": "550 Pamlar Ave B, San Jose, CA 95128",
     "updated": "2026-01-11"
   },
@@ -77,6 +101,7 @@
     "birthday": "2001-02-15",
     "phone": "775-447-2486",
     "address": "574 Sunflower Road, Rexburg, ID 83440",
+    "email": "ethandelin@gmail.com"
     "updated": "2026-01-11"
   },
   {
