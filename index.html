@@ -41,13 +41,19 @@
             opacity: 0;
             pointer-events: none;
         }
+        .search-match b {
+            color: #1e40af;
+            font-weight: 800;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900 overflow-hidden" onclick="closeDropdowns(event)">
 
     <!-- LOGIN INTERFACE -->
     <div id="login-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-100">
-        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center">
+        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-md:mx-4 max-w-md text-center">
             <h1 class="text-3xl font-bold mb-6 text-gray-800">Family Directory</h1>
             <input type="password" id="password-input" placeholder="Enter Password" 
                    class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:outline-none mb-4">
@@ -250,10 +256,10 @@
                     <i data-lucide="calendar" class="w-8 h-8"></i>
                 </div>
                 <h3 class="text-xl font-bold text-gray-900 mb-2">Export Birthdays</h3>
-                <p class="text-sm text-gray-500 mb-8">This will export the birthdays of all currently filtered contacts.</p>
+                <p class="text-sm text-gray-500 mb-8">This will export the birthdays of only currently filtered contacts.</p>
                 <div class="flex gap-3">
                     <button onclick="toggleExportModal()" class="flex-1 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition">Cancel</button>
-                    <button onclick="confirmExport()" class="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition shadow-lg shadow-emerald-200">Export</button>
+                    <button onclick="confirmExport()" class="flex-1 py-3 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition shadow-lg shadow-emerald-200">Confirm</button>
                 </div>
             </div>
         </div>
@@ -273,6 +279,10 @@
             'bg-blue-600', 'bg-indigo-600', 'bg-emerald-600', 
             'bg-rose-600', 'bg-amber-600', 'bg-violet-600', 'bg-teal-600'
         ];
+
+        const STATE_MAP = {
+            "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR", "california": "CA", "colorado": "CO", "connecticut": "CT", "delaware": "DE", "florida": "FL", "georgia": "GA", "hawaii": "HI", "idaho": "ID", "illinois": "IL", "indiana": "IN", "iowa": "IA", "kansas": "KS", "kentucky": "KY", "louisiana": "LA", "maine": "ME", "maryland": "MD", "massachusetts": "MA", "michigan": "MI", "minnesota": "MN", "mississippi": "MS", "missouri": "MO", "montana": "MT", "nebraska": "NE", "nevada": "NV", "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM", "new york": "NY", "north carolina": "NC", "north dakota": "ND", "ohio": "OH", "oklahoma": "OK", "oregon": "OR", "pennsylvania": "PA", "rhode island": "RI", "south carolina": "SC", "south dakota": "SD", "tennessee": "TN", "texas": "TX", "utah": "UT", "vermont": "VT", "virginia": "VA", "washington": "WA", "west virginia": "WV", "wisconsin": "WI", "wyoming": "WY"
+        };
 
         function checkPassword() {
             const input = document.getElementById('password-input').value;
@@ -305,6 +315,20 @@
                 const response = await fetch('family.json', { cache: "no-store" });
                 familyData = await response.json();
                 renderDirectory();
+                
+                const urlParams = new URLSearchParams(window.location.search);
+                const idParam = urlParams.get('id');
+                if (idParam) {
+                    const person = familyData.find(f => f.id === idParam);
+                    if (person) {
+                        if (person.id.length < 5 && hideAncestors) {
+                            hideAncestors = false;
+                            document.getElementById('filter-ancestors').checked = false;
+                            renderDirectory();
+                        }
+                        selectPerson(person);
+                    }
+                }
                 startBackgroundGeocoding();
             } catch (err) {
                 console.error("Data load error:", err);
@@ -331,50 +355,87 @@
             }
         }
 
+        /**
+         * Enhanced Search with Soft Mapping and Highlighting
+         */
+        function searchFilter(person, query) {
+            if (!query) return null;
+            const lowerQuery = query.toLowerCase().trim();
+            const searchableFields = ['name', 'phone', 'email', 'address', 'birthday', 'id'];
+            
+            // Soft mapping (State names to Abbreviations)
+            let altQuery = null;
+            for (const [fullName, abbrev] of Object.entries(STATE_MAP)) {
+                if (lowerQuery === fullName) altQuery = abbrev.toLowerCase();
+                else if (lowerQuery === abbrev.toLowerCase()) altQuery = fullName;
+            }
+
+            for (const field of searchableFields) {
+                const val = (person[field] || "").toString().toLowerCase();
+                if (val.includes(lowerQuery) || (altQuery && val.includes(altQuery))) {
+                    // Return which field matched and what the actual text is
+                    const matchText = (altQuery && val.includes(altQuery)) ? altQuery : lowerQuery;
+                    return { field, value: person[field], match: matchText };
+                }
+            }
+            return null;
+        }
+
+        function highlightMatch(text, match) {
+            if (!text) return "";
+            const regex = new RegExp(`(${match})`, 'gi');
+            return text.toString().replace(regex, '<b>$1</b>');
+        }
+
         function renderDirectory(searchTerm = "") {
             const listContainer = document.getElementById('directory-list');
             listContainer.innerHTML = "";
             if (!familyData || !familyData.length) return;
 
-            const lowerSearch = searchTerm.toLowerCase();
+            const isSearching = searchTerm.length > 0;
+            const matches = [];
 
-            lastFilteredData = familyData.filter(p => {
-                const matchesSearch = Object.values(p).some(val => 
-                    val && val.toString().toLowerCase().includes(lowerSearch)
-                );
-                
-                if (searchTerm) return matchesSearch;
-                if (!filterFromId) {
-                    const isAncestral = p.id.length < 5 && !p.id.includes('s');
-                    return hideAncestors ? !isAncestral : true;
-                }
-
-                const isSpouse = p.id.includes('s');
-                const baseId = isSpouse ? p.id.split('s')[0] : p.id;
-                const filterBaseId = filterFromId.includes('s') ? filterFromId.split('s')[0] : filterFromId;
-
-                switch(relFilterMode) {
-                    case 'siblings':
-                        const parentPrefix = filterBaseId.substring(0, filterBaseId.length - 1);
-                        return baseId.startsWith(parentPrefix) && baseId.length === filterBaseId.length;
-                    case 'parents':
-                        return baseId === filterBaseId.substring(0, filterBaseId.length - 1);
-                    case 'children':
-                        return baseId.startsWith(filterBaseId) && baseId.length === filterBaseId.length + 1;
-                    default:
-                        return p.id.startsWith(filterFromId);
-                }
-            });
-
-            if (searchTerm || relFilterMode !== 'branch') {
-                lastFilteredData.sort((a,b) => a.id.localeCompare(b.id));
-                lastFilteredData.forEach(p => listContainer.appendChild(createPersonItem(p)));
+            if (isSearching) {
+                familyData.forEach(p => {
+                    const matchResult = searchFilter(p, searchTerm);
+                    if (matchResult) matches.push({ person: p, match: matchResult });
+                });
+                lastFilteredData = matches.map(m => m.person);
+                matches.sort((a,b) => a.person.name.localeCompare(b.person.name));
+                matches.forEach(m => listContainer.appendChild(createPersonItem(m.person, m.match)));
             } else {
-                const sortedData = [...lastFilteredData].sort((a, b) => a.id.length - b.id.length || a.id.localeCompare(b.id));
-                if (sortedData.length > 0) {
-                    const minLen = sortedData[0].id.length;
-                    const rootNodes = sortedData.filter(p => p.id.length === minLen);
-                    rootNodes.forEach(node => buildTreeNode(node, lastFilteredData, listContainer));
+                lastFilteredData = familyData.filter(p => {
+                    if (!filterFromId) {
+                        const isAncestral = p.id.length < 5 && !p.id.includes('s');
+                        return hideAncestors ? !isAncestral : true;
+                    }
+                    const isSpouse = p.id.includes('s');
+                    const baseId = isSpouse ? p.id.split('s')[0] : p.id;
+                    const filterBaseId = filterFromId.includes('s') ? filterFromId.split('s')[0] : filterFromId;
+
+                    switch(relFilterMode) {
+                        case 'siblings':
+                            const parentPrefix = filterBaseId.substring(0, filterBaseId.length - 1);
+                            return baseId.startsWith(parentPrefix) && baseId.length === filterBaseId.length;
+                        case 'parents':
+                            return baseId === filterBaseId.substring(0, filterBaseId.length - 1);
+                        case 'children':
+                            return baseId.startsWith(filterBaseId) && baseId.length === filterBaseId.length + 1;
+                        default:
+                            return p.id.startsWith(filterFromId);
+                    }
+                });
+
+                if (relFilterMode !== 'branch' && filterFromId) {
+                    lastFilteredData.sort((a,b) => a.id.localeCompare(b.id));
+                    lastFilteredData.forEach(p => listContainer.appendChild(createPersonItem(p)));
+                } else {
+                    const sortedData = [...lastFilteredData].sort((a, b) => a.id.length - b.id.length || a.id.localeCompare(b.id));
+                    if (sortedData.length > 0) {
+                        const minLen = sortedData[0].id.length;
+                        const rootNodes = sortedData.filter(p => p.id.length === minLen);
+                        rootNodes.forEach(node => buildTreeNode(node, lastFilteredData, listContainer));
+                    }
                 }
             }
             updateFilterIndicator();
@@ -422,14 +483,23 @@
             }
         }
 
-        function createPersonItem(p) {
+        function createPersonItem(p, searchMatch = null) {
             const isSpouse = p.id.includes('s');
             const div = document.createElement('div');
             div.className = "flex items-center justify-between p-2 pl-6 hover:bg-blue-50 hover:text-blue-700 rounded-lg cursor-pointer group transition";
+            
+            // If we have a search match in a field that isn't the name, show it instead of the ID
+            let rightColumnContent = p.id;
+            if (searchMatch) {
+                // Highlight the match
+                rightColumnContent = highlightMatch(searchMatch.value, searchMatch.match);
+            }
+
             div.innerHTML = `<div class="flex items-center gap-2">
                 <i data-lucide="${isSpouse ? 'link' : 'user'}" class="w-3 h-3 ${isSpouse ? 'text-pink-400' : 'text-gray-300'}"></i>
                 <span class="text-sm font-medium">${p.name}</span>
-            </div><span class="text-[10px] text-gray-400 font-mono">${p.id}</span>`;
+            </div><span class="text-[10px] text-gray-400 font-mono search-match truncate ml-4 max-w-[120px] text-right">${rightColumnContent}</span>`;
+            
             div.onclick = () => selectPerson(p);
             return div;
         }
@@ -601,6 +671,7 @@
         }
         function toggleAncestorFilter() { hideAncestors = document.getElementById('filter-ancestors').checked; }
         function editOnGithub() { window.open("https://github.com/", '_blank'); }
+        document.getElementById('password-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') checkPassword(); });
     </script>
 </body>
 </html>
