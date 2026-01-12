@@ -201,7 +201,7 @@
 
         async function initApp() {
             try {
-                const response = await fetch('family.json');
+                const response = await fetch('//family.json');
                 familyData = await response.json();
                 renderDirectory();
             } catch (err) {
