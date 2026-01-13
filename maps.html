@@ -27,7 +27,7 @@
             <h1 class="font-bold text-xl">Family Map</h1>
         </div>
         <div class="flex items-center gap-4">
-            <div id="status-text" class="text-sm text-gray-500 font-medium tracking-tight">Initializing...</div>
+            <div id="status-text" class="text-sm text-gray-500 font-medium tracking-tight">Connecting to cloud...</div>
             <button onclick="toggleErrorSidebar()" id="error-toggle" class="hidden flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold border border-amber-100 hover:bg-amber-100 transition">
                 <i data-lucide="alert-circle" class="w-4 h-4"></i>
                 <span id="error-count">0</span> Issues
@@ -38,7 +38,7 @@
     <main class="relative flex overflow-hidden sidebar-height">
         <!-- Sidebar for Failed Addresses -->
         <aside id="error-sidebar" class="hidden w-80 bg-white border-r overflow-y-auto shrink-0 transition-all duration-300">
-            <div class="p-4 border-b bg-gray-50 flex items-center justify-between sticky top-0">
+            <div class="p-4 border-b bg-gray-50 flex items-center justify-between sticky top-0 z-10">
                 <h2 class="font-bold text-sm text-slate-800">Unmapped Locations</h2>
                 <button onclick="toggleErrorSidebar()" class="text-gray-400 hover:text-gray-600">
                     <i data-lucide="x" class="w-4 h-4"></i>
@@ -56,13 +56,35 @@
             <div id="loader" class="loading-overlay absolute inset-0 z-20 flex flex-col items-center justify-center">
                 <div class="w-12 h-12 border-4 border-slate-900 border-t-transparent rounded-full animate-spin mb-4"></div>
                 <p class="font-bold text-slate-900 text-lg">Loading Map Data...</p>
-                <p id="progress-text" class="text-sm text-gray-500 mt-2">Checking cached locations...</p>
+                <p id="progress-text" class="text-sm text-gray-500 mt-2">Authenticating family session...</p>
             </div>
         </div>
     </main>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script>
+    
+    <!-- Firebase Integration -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Your specific Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyARswMnYZvOjI1__gC05deuc0RwM-xPKnk",
+            authDomain: "andelin-directory.firebaseapp.com",
+            projectId: "andelin-directory",
+            storageBucket: "andelin-directory.firebasestorage.app",
+            messagingSenderId: "227703371774",
+            appId: "1:227703371774:web:bbd2bbe303dd8292c472af",
+            measurementId: "G-YP1P7BMYBZ"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = 'andelin-family';
+
         let map;
         let familyData = [];
         const markers = [];
@@ -70,20 +92,40 @@
 
         // --- AUTH CHECK ---
         if (sessionStorage.getItem('family_auth') !== 'true') {
-            location.href = 'index.html';
+            window.location.href = 'index.html';
         }
 
         async function init() {
             lucide.createIcons();
+            
+            // Initialize Leaflet Map
             map = L.map('map').setView([39.8283, -98.5795], 4);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+                attribution: '© OpenStreetMap' 
+            }).addTo(map);
 
             try {
-                const response = await fetch('family.json', { cache: "no-store" });
-                familyData = await response.json();
-                processAddresses();
+                // Auth anonymously for secure Firestore access
+                await signInAnonymously(auth);
+                
+                document.getElementById('progress-text').textContent = "Fetching family records...";
+                
+                // Fetch from correct path: artifacts -> {appId} -> public -> data -> members
+                const familyRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
+                const snapshot = await getDocs(familyRef);
+                
+                familyData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                if (familyData.length === 0) {
+                    document.getElementById('progress-text').textContent = "No members found in cloud database.";
+                    document.getElementById('loader').classList.add('hidden');
+                    return;
+                }
+
+                await processAddresses();
             } catch (err) {
-                document.getElementById('progress-text').textContent = "Error loading family.json";
+                console.error("Firebase error:", err);
+                document.getElementById('progress-text').textContent = "Database connection failed.";
             }
         }
 
@@ -91,6 +133,7 @@
             const geocodedPeople = familyData.filter(p => p.address && p.address.trim() !== "");
             const geoCache = JSON.parse(localStorage.getItem('family_geo_cache') || '{}');
             
+            // Group people by shared address string
             const addressGroups = {};
             geocodedPeople.forEach(person => {
                 const addr = person.address.trim();
@@ -106,22 +149,25 @@
                 count++;
                 const people = addressGroups[addr];
                 
+                // 1. Try to load from browser cache first (generated by index.html background worker)
                 const cachedCoords = geoCache[addr];
                 if (cachedCoords) {
                     addMarker(people, cachedCoords, addr);
-                    document.getElementById('progress-text').textContent = `Loaded ${count} of ${total}`;
+                    document.getElementById('progress-text').textContent = `Loaded ${count} of ${total} locations`;
                     continue;
                 }
 
-                document.getElementById('progress-text').textContent = `Searching ${count} of ${total}`;
+                // 2. Fallback to slow Geocoding (respecting rate limits)
+                document.getElementById('progress-text').textContent = `Plotting new address ${count} of ${total}...`;
                 try {
                     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}&limit=1`;
-                    const res = await fetch(url, { headers: { 'User-Agent': 'FamilyDirPlotter' } });
+                    const res = await fetch(url, { headers: { 'User-Agent': 'FamilyDirMap' } });
                     const data = await res.json();
                     
                     if (data && data.length > 0) {
                         const coords = { lat: data[0].lat, lon: data[0].lon };
                         addMarker(people, coords, addr);
+                        // Save to cache for next time
                         geoCache[addr] = coords;
                         localStorage.setItem('family_geo_cache', JSON.stringify(geoCache));
                     } else {
@@ -131,6 +177,7 @@
                     failedAddresses.push({ address: addr, people: people });
                 }
 
+                // nominatim requires roughly 1 second delay
                 await new Promise(r => setTimeout(r, 1200));
             }
 
@@ -155,11 +202,11 @@
                 
                 errorList.innerHTML = failedAddresses.map(fail => `
                     <div class="p-3 bg-white border border-gray-100 rounded-xl shadow-sm">
-                        <div class="flex items-start gap-3 mb-2">
+                        <div class="flex items-start gap-3 mb-3">
                             <i data-lucide="map-pin-off" class="w-4 h-4 text-amber-500 shrink-0 mt-0.5"></i>
                             <p class="text-[11px] text-gray-500 font-medium leading-relaxed">${fail.address}</p>
                         </div>
-                        <div class="space-y-1 pl-7">
+                        <div class="space-y-2 pl-7">
                             ${fail.people.map(p => `
                                 <div class="flex items-center justify-between gap-2">
                                     <span class="text-xs font-bold text-slate-800">${p.name}</span>
@@ -173,7 +220,7 @@
             }
         }
 
-        function toggleErrorSidebar() {
+        window.toggleErrorSidebar = function() {
             const sidebar = document.getElementById('error-sidebar');
             sidebar.classList.toggle('hidden');
             setTimeout(() => { map.invalidateSize(); }, 300);
@@ -184,9 +231,7 @@
             
             const nameList = people.map(p => `
                 <div class="flex items-center justify-between gap-4 py-2 border-b border-gray-100 last:border-0">
-                    <div>
-                        <p class="font-bold text-slate-900 text-sm">${p.name}</p>
-                    </div>
+                    <p class="font-bold text-slate-900 text-sm">${p.name}</p>
                     <a href="index.html?id=${p.id}" class="bg-blue-600 text-white px-3 py-1.5 rounded-md text-[10px] font-bold hover:bg-blue-700 transition shadow-sm whitespace-nowrap">
                         View Profile
                     </a>
@@ -212,7 +257,8 @@
             markers.push(marker);
         }
 
-        window.onload = init;
+        // Initialize the app logic
+        init();
     </script>
 </body>
 </html>
