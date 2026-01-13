@@ -10,7 +10,6 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
         
-        /* Flexbox-based height management for reliable scrolling */
         .app-height { height: 100vh; height: 100dvh; }
         .main-height { flex: 1; min-height: 0; }
         
@@ -50,6 +49,10 @@
             font-weight: 800;
             text-decoration: underline;
             text-underline-offset: 2px;
+        }
+        
+        .edit-input {
+            @apply w-full px-2 py-1 border border-blue-200 rounded focus:ring-2 focus:ring-blue-500 outline-none bg-blue-50/50;
         }
     </style>
 </head>
@@ -105,6 +108,12 @@
                             Export Birthdays (.ics)
                         </button>
                         <div class="border-t border-gray-100 my-1"></div>
+                        <p class="px-3 py-1 text-[10px] uppercase font-bold text-gray-400 tracking-wider">Migration</p>
+                        <button onclick="migrateJsonToFirestore()" class="flex items-center gap-3 w-full px-3 py-2 text-sm text-amber-600 hover:bg-amber-50 rounded-lg transition">
+                            <i data-lucide="database-backup" class="w-4 h-4"></i>
+                            Seed Cloud from JSON
+                        </button>
+                        <div class="border-t border-gray-100 my-1"></div>
                         <p class="px-3 py-1 text-[10px] uppercase font-bold text-gray-400 tracking-wider">Session</p>
                         <button onclick="logout()" class="flex items-center gap-3 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition">
                             <i data-lucide="log-out" class="w-4 h-4"></i>
@@ -133,7 +142,7 @@
                 </div>
 
                 <div id="directory-list" class="p-2 space-y-1">
-                    <div class="p-8 text-center text-gray-400">Loading family data...</div>
+                    <div class="p-8 text-center text-gray-400">Connecting to Cloud Database...</div>
                 </div>
             </aside>
 
@@ -157,9 +166,12 @@
                     </div>
                     
                     <div class="p-8">
-                        <div class="flex justify-end">
-                            <button onclick="editOnGithub()" class="text-sm text-gray-500 hover:text-blue-600 flex items-center gap-1 shrink-0">
-                                <i data-lucide="edit-3" class="w-4 h-4"></i> Edit
+                        <div class="flex justify-end gap-2">
+                            <button id="edit-btn" onclick="toggleEditMode()" class="text-sm text-gray-500 hover:text-blue-600 flex items-center gap-1 shrink-0 px-3 py-1 rounded-lg hover:bg-blue-50 transition">
+                                <i data-lucide="edit-3" class="w-4 h-4"></i> <span>Edit</span>
+                            </button>
+                            <button id="save-btn" onclick="saveProfileChanges()" class="hidden text-sm text-white bg-green-600 hover:bg-green-700 flex items-center gap-1 shrink-0 px-4 py-1 rounded-lg shadow-sm transition">
+                                <i data-lucide="save" class="w-4 h-4"></i> <span>Save Changes</span>
                             </button>
                         </div>
 
@@ -177,12 +189,13 @@
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-10">
                             <div class="space-y-6">
-                                <div>
+                                <div id="field-birthday">
                                     <label class="text-xs font-bold text-gray-400 uppercase tracking-wider">Birthday</label>
-                                    <p id="card-birthday" class="text-lg font-medium flex items-center gap-2 mt-1 text-gray-800">
+                                    <div class="view-val text-lg font-medium flex items-center gap-2 mt-1 text-gray-800">
                                         <i data-lucide="cake" class="w-5 h-5 text-pink-400"></i>
                                         <span>Not listed</span>
-                                    </p>
+                                    </div>
+                                    <input type="date" class="edit-val hidden edit-input mt-1">
                                 </div>
                                 <div id="spouse-section" class="hidden">
                                     <label class="text-xs font-bold text-gray-400 uppercase tracking-wider">Spouse</label>
@@ -191,29 +204,32 @@
                                         <span id="card-spouse-name">Spouse Name</span>
                                     </button>
                                 </div>
-                                <div>
+                                <div id="field-email">
                                     <label class="text-xs font-bold text-gray-400 uppercase tracking-wider">Email Address</label>
-                                    <a id="card-email-link" href="#" class="text-lg font-medium text-blue-600 flex items-center gap-2 mt-1 hover:underline">
+                                    <a id="card-email-link" href="#" class="view-val text-lg font-medium text-blue-600 flex items-center gap-2 mt-1 hover:underline">
                                         <i data-lucide="mail" class="w-5 h-5"></i>
                                         <span id="card-email">Not listed</span>
                                     </a>
+                                    <input type="email" class="edit-val hidden edit-input mt-1" placeholder="email@example.com">
                                 </div>
                             </div>
                             <div class="space-y-6">
-                                <div>
+                                <div id="field-phone">
                                     <label class="text-xs font-bold text-gray-400 uppercase tracking-wider">Phone Number</label>
-                                    <a id="card-phone-link" href="#" class="text-lg font-medium text-blue-600 flex items-center gap-2 mt-1 hover:underline">
+                                    <a id="card-phone-link" href="#" class="view-val text-lg font-medium text-blue-600 flex items-center gap-2 mt-1 hover:underline">
                                         <i data-lucide="phone" class="w-5 h-5"></i>
                                         <span id="card-phone">Not listed</span>
                                     </a>
+                                    <input type="tel" class="edit-val hidden edit-input mt-1" placeholder="555-555-5555">
                                 </div>
-                                <div>
+                                <div id="field-address">
                                     <label class="text-xs font-bold text-gray-400 uppercase tracking-wider">Mailing Address</label>
-                                    <div class="flex gap-2 mt-1">
+                                    <div class="view-val flex gap-2 mt-1">
                                         <i data-lucide="map-pin" class="w-5 h-5 text-red-400 shrink-0 mt-1"></i>
                                         <address id="card-address" class="not-italic text-lg text-gray-700">Not listed</address>
                                     </div>
-                                    <a id="card-map-link" href="#" target="_blank" class="text-sm text-blue-500 mt-2 inline-block hover:underline font-medium hidden">Open in Maps →</a>
+                                    <textarea class="edit-val hidden edit-input mt-1 h-20" placeholder="Street, City, State, Zip"></textarea>
+                                    <a id="card-map-link" href="#" target="_blank" class="view-val text-sm text-blue-500 mt-2 inline-block hover:underline font-medium hidden">Open in Maps →</a>
                                 </div>
                             </div>
                         </div>
@@ -267,163 +283,200 @@
                 </div>
             </div>
         </div>
+
+        <div id="status-modal" class="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center hidden p-4">
+            <div class="bg-white rounded-2xl max-w-xs w-full p-6 shadow-2xl text-center">
+                <div id="status-icon" class="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 bg-blue-50 text-blue-600">
+                    <i data-lucide="loader" class="animate-spin"></i>
+                </div>
+                <h3 id="status-title" class="font-bold text-gray-900">Working...</h3>
+                <p id="status-desc" class="text-xs text-gray-500 mt-2"></p>
+            </div>
+        </div>
     </div>
 
-    <script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, updateDoc, onSnapshot, query, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase Setup with User Provided Config
+        const firebaseConfig = {
+            apiKey: "AIzaSyARswMnYZvOjI1__gC05deuc0RwM-xPKnk",
+            authDomain: "andelin-directory.firebaseapp.com",
+            projectId: "andelin-directory",
+            storageBucket: "andelin-directory.firebasestorage.app",
+            messagingSenderId: "227703371774",
+            appId: "1:227703371774:web:bbd2bbe303dd8292c472af",
+            measurementId: "G-YP1P7BMYBZ"
+        };
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = 'andelin-family';
+
+        // Globals
         let familyData = []; 
         let lastFilteredData = [];
+        let isEditMode = false;
         const FAMILY_PASSWORD = "sillygoose"; 
+        const COLORS = ['bg-blue-600', 'bg-indigo-600', 'bg-emerald-600', 'bg-rose-600', 'bg-amber-600', 'bg-violet-600', 'bg-teal-600'];
+        const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
         
+        const STATE_MAP = { "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR", "california": "CA", "colorado": "CO", "connecticut": "CT", "delaware": "DE", "florida": "FL", "georgia": "GA", "hawaii": "HI", "idaho": "ID", "illinois": "IL", "indiana": "IN", "iowa": "IA", "kansas": "KS", "kentucky": "KY", "louisiana": "LA", "maine": "ME", "maryland": "MD", "massachusetts": "MA", "michigan": "MI", "minnesota": "MN", "mississippi": "MS", "missouri": "MO", "montana": "MT", "nebraska": "NE", "nevada": "NV", "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM", "new york": "NY", "north carolina": "NC", "north dakota": "ND", "ohio": "OH", "oklahoma": "OK", "oregon": "OR", "pennsylvania": "PA", "rhode island": "RI", "south carolina": "SC", "south dakota": "SD", "tennessee": "TN", "texas": "TX", "utah": "UT", "vermont": "VT", "virginia": "VA", "washington": "WA", "west virginia": "WV", "wisconsin": "WI", "wyoming": "WY" };
+
         let hideAncestors = true;
         let filterFromId = "";
         let relFilterMode = "branch";
         let selectedPerson = null;
 
-        const COLORS = [
-            'bg-blue-600', 'bg-indigo-600', 'bg-emerald-600', 
-            'bg-rose-600', 'bg-amber-600', 'bg-violet-600', 'bg-teal-600'
-        ];
-
-        const STATE_MAP = {
-            "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR", "california": "CA", "colorado": "CO", "connecticut": "CT", "delaware": "DE", "florida": "FL", "georgia": "GA", "hawaii": "HI", "idaho": "ID", "illinois": "IL", "indiana": "IN", "iowa": "IA", "kansas": "KS", "kentucky": "KY", "louisiana": "LA", "maine": "ME", "maryland": "MD", "massachusetts": "MA", "michigan": "MI", "minnesota": "MN", "mississippi": "MS", "missouri": "MO", "montana": "MT", "nebraska": "NE", "nevada": "NV", "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM", "new york": "NY", "north carolina": "NC", "north dakota": "ND", "ohio": "OH", "oklahoma": "OK", "oregon": "OR", "pennsylvania": "PA", "rhode island": "RI", "south carolina": "SC", "south dakota": "SD", "tennessee": "TN", "texas": "TX", "utah": "UT", "vermont": "VT", "virginia": "VA", "washington": "WA", "west virginia": "WV", "wisconsin": "WI", "wyoming": "WY"
+        // --- EXPOSE WINDOW FUNCTIONS ---
+        window.checkPassword = async function() {
+            const input = document.getElementById('password-input').value;
+            if (input === FAMILY_PASSWORD) {
+                sessionStorage.setItem('family_auth', 'true');
+                await startApp();
+            } else {
+                document.getElementById('login-error').classList.remove('hidden');
+            }
         };
 
-        const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        window.logout = () => {
+            sessionStorage.removeItem('family_auth');
+            location.reload();
+        };
 
-        // Helper to format YYYY-MM-DD into "Month Day, Year"
+        window.toggleEditMode = (forceState) => {
+            isEditMode = forceState !== undefined ? forceState : !isEditMode;
+            const card = document.getElementById('contact-card');
+            const editBtn = document.getElementById('edit-btn');
+            const saveBtn = document.getElementById('save-btn');
+            if (isEditMode) {
+                editBtn.querySelector('span').textContent = "Cancel";
+                editBtn.classList.add('text-red-500');
+                saveBtn.classList.remove('hidden');
+                card.querySelector('#field-birthday .edit-val').value = selectedPerson.birthday || "";
+                card.querySelector('#field-email .edit-val').value = selectedPerson.email || "";
+                card.querySelector('#field-phone .edit-val').value = selectedPerson.phone || "";
+                card.querySelector('#field-address .edit-val').value = selectedPerson.address || "";
+                card.querySelectorAll('.view-val').forEach(el => el.classList.add('hidden'));
+                card.querySelectorAll('.edit-val').forEach(el => el.classList.remove('hidden'));
+            } else {
+                editBtn.querySelector('span').textContent = "Edit";
+                editBtn.classList.remove('text-red-500');
+                saveBtn.classList.add('hidden');
+                card.querySelectorAll('.view-val').forEach(el => el.classList.remove('hidden'));
+                card.querySelectorAll('.edit-val').forEach(el => el.classList.add('hidden'));
+                if (selectedPerson) selectPerson(familyData.find(f => f.id === selectedPerson.id));
+            }
+            lucide.createIcons();
+        };
+
+        window.saveProfileChanges = async function() {
+            if (!selectedPerson) return;
+            const card = document.getElementById('contact-card');
+            const updatedData = {
+                birthday: card.querySelector('#field-birthday .edit-val').value,
+                email: card.querySelector('#field-email .edit-val').value,
+                phone: card.querySelector('#field-phone .edit-val').value,
+                address: card.querySelector('#field-address .edit-val').value,
+                updated: new Date().toISOString().split('T')[0]
+            };
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', selectedPerson.id);
+                await updateDoc(docRef, updatedData);
+                window.toggleEditMode(false);
+            } catch (e) { console.error("Save failed:", e); }
+        };
+
+        window.migrateJsonToFirestore = async function() {
+            if (!confirm("This will read family.json and upload all members to your cloud database. Continue?")) return;
+            showStatus("Migrating...", "Reading family.json and pushing to Firebase.");
+            try {
+                const response = await fetch('family.json', { cache: "no-store" });
+                const localData = await response.json();
+                const batch = writeBatch(db);
+                localData.forEach(person => {
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'members', person.id);
+                    batch.set(docRef, person);
+                });
+                await batch.commit();
+                showStatus("Success!", "Data migrated. You can now delete family.json.", "check-circle", "text-green-600");
+                setTimeout(hideStatus, 3000);
+            } catch (err) {
+                showStatus("Error", "Migration failed. Is family.json available?", "alert-triangle", "text-red-600");
+            }
+        };
+
+        window.handleSearch = (source) => {
+            const val = source === 'mobile' ? document.getElementById('search-input-mobile').value : document.getElementById('search-input').value;
+            renderDirectory(val.trim());
+        };
+
+        window.toggleTools = (e) => { e.stopPropagation(); document.getElementById('tools-dropdown').classList.toggle('dropdown-hidden'); };
+        window.closeDropdowns = (e) => { if (!e.target.closest('.dropdown-menu')) document.getElementById('tools-dropdown').classList.add('dropdown-hidden'); };
+        window.toggleFilters = () => document.getElementById('filter-modal').classList.toggle('hidden');
+        window.toggleExportModal = () => document.getElementById('export-modal').classList.toggle('hidden');
+        window.closeContact = (toList) => { if (toList) { document.getElementById('sidebar').classList.remove('mobile-hidden'); document.getElementById('contact-panel').classList.add('mobile-hidden'); document.getElementById('mobile-back').classList.add('hidden'); } };
+
+        window.confirmExport = () => {
+            const events = lastFilteredData.filter(p => p.birthday && p.birthday.includes('-')).map(p => {
+                const cleanBday = p.birthday.replace(/-/g, '');
+                return `BEGIN:VEVENT\nSUMMARY:Birthday - ${p.name}\nDTSTART;VALUE=DATE:${cleanBday}\nRRULE:FREQ=YEARLY\nTRANSP:TRANSPARENT\nEND:VEVENT`;
+            });
+            const ics = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Family Directory//EN\n${events.join('\n')}\nEND:VCALENDAR`;
+            const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url; link.setAttribute('download', 'family_birthdays.ics');
+            document.body.appendChild(link); link.click(); document.body.removeChild(link);
+            window.toggleExportModal();
+        };
+
+        window.jumpToRel = (type) => {
+            if (!selectedPerson) return;
+            let baseId = selectedPerson.id.includes('s') ? selectedPerson.id.split('s')[0] : selectedPerson.id;
+            filterFromId = baseId;
+            relFilterMode = type;
+            document.getElementById('filter-from-input').value = baseId;
+            renderDirectory();
+            if (window.innerWidth < 768) window.closeContact(true);
+        };
+
+        // --- CORE LOGIC ---
+        async function startApp() {
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('app-interface').classList.remove('hidden');
+            await signInAnonymously(auth);
+            onAuthStateChanged(auth, (user) => {
+                if (user) initDirectoryListener();
+            });
+        }
+
+        function initDirectoryListener() {
+            const familyRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
+            onSnapshot(familyRef, (snapshot) => {
+                familyData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderDirectory();
+                handleUrlParam();
+                startBackgroundGeocoding();
+            });
+        }
+
         function formatDate(dateStr) {
             if (!dateStr || !dateStr.includes('-')) return dateStr || "Not listed";
             const parts = dateStr.split('-');
             if (parts.length !== 3) return dateStr;
-            const year = parts[0];
-            const monthIdx = parseInt(parts[1]) - 1;
-            const day = parseInt(parts[2]);
-            if (isNaN(monthIdx) || !MONTHS[monthIdx]) return dateStr;
-            return `${MONTHS[monthIdx]} ${day}, ${year}`;
-        }
-
-        function checkPassword() {
-            const input = document.getElementById('password-input').value;
-            if (input === FAMILY_PASSWORD) {
-                sessionStorage.setItem('family_auth', 'true');
-                document.getElementById('login-screen').classList.add('hidden');
-                document.getElementById('app-interface').classList.remove('hidden');
-                initApp();
-            } else {
-                document.getElementById('login-error').classList.remove('hidden');
-            }
-        }
-
-        function logout() {
-            sessionStorage.removeItem('family_auth');
-            location.reload();
-        }
-
-        window.onload = function() {
-            if (sessionStorage.getItem('family_auth') === 'true') {
-                document.getElementById('login-screen').classList.add('hidden');
-                document.getElementById('app-interface').classList.remove('hidden');
-                initApp();
-            }
-        };
-
-        async function initApp() {
-            const listContainer = document.getElementById('directory-list');
-            try {
-                const response = await fetch('family.json', { cache: "no-store" });
-                familyData = await response.json();
-                renderDirectory();
-                
-                const urlParams = new URLSearchParams(window.location.search);
-                const idParam = urlParams.get('id');
-                if (idParam) {
-                    const person = familyData.find(f => f.id === idParam);
-                    if (person) {
-                        if (person.id.length < 5 && hideAncestors) {
-                            hideAncestors = false;
-                            document.getElementById('filter-ancestors').checked = false;
-                            renderDirectory();
-                        }
-                        selectPerson(person);
-                    }
-                }
-                startBackgroundGeocoding();
-            } catch (err) {
-                console.error("Data load error:", err);
-                listContainer.innerHTML = `<div class="p-6 text-center text-red-500"><p class="font-bold">Error loading family.json</p></div>`;
-            }
-            lucide.createIcons();
-        }
-
-        async function startBackgroundGeocoding() {
-            const cache = JSON.parse(localStorage.getItem('family_geo_cache') || '{}');
-            const toGeocode = familyData.filter(p => p.address && !cache[p.address]);
-            for (const person of toGeocode) {
-                if (cache[person.address]) continue;
-                try {
-                    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(person.address)}&limit=1`;
-                    const res = await fetch(url, { headers: { 'User-Agent': 'FamilyDirPlotter' } });
-                    const data = await res.json();
-                    if (data && data.length > 0) {
-                        cache[person.address] = { lat: data[0].lat, lon: data[0].lon };
-                        localStorage.setItem('family_geo_cache', JSON.stringify(cache));
-                    }
-                } catch (e) {}
-                await new Promise(r => setTimeout(r, 1200));
-            }
-        }
-
-        function searchFilter(person, query) {
-            if (!query) return null;
-            const lowerQuery = query.toLowerCase().trim();
-            const searchableFields = ['name', 'phone', 'email', 'address', 'birthday', 'id'];
-            
-            // Soft mapping (State names to Abbreviations)
-            let altQuery = null;
-            for (const [fullName, abbrev] of Object.entries(STATE_MAP)) {
-                if (lowerQuery === fullName) altQuery = abbrev.toLowerCase();
-                else if (lowerQuery === abbrev.toLowerCase()) altQuery = fullName;
-            }
-
-            for (const field of searchableFields) {
-                let actualValue = (person[field] || "").toString();
-                let displayValue = actualValue;
-                
-                // If it's the birthday field, check both numeric and formatted versions
-                if (field === 'birthday') {
-                    displayValue = formatDate(actualValue);
-                    const lowerDisplay = displayValue.toLowerCase();
-                    const lowerActual = actualValue.toLowerCase();
-                    
-                    if (lowerDisplay.includes(lowerQuery) || lowerActual.includes(lowerQuery)) {
-                        return { field, value: displayValue, match: lowerQuery };
-                    }
-                } else {
-                    const lowerVal = actualValue.toLowerCase();
-                    if (lowerVal.includes(lowerQuery) || (altQuery && lowerVal.includes(altQuery))) {
-                        const matchText = (altQuery && lowerVal.includes(altQuery)) ? altQuery : lowerQuery;
-                        return { field, value: displayValue, match: matchText };
-                    }
-                }
-            }
-            return null;
-        }
-
-        function highlightMatch(text, match) {
-            if (!text) return "";
-            const regex = new RegExp(`(${match})`, 'gi');
-            return text.toString().replace(regex, '<b>$1</b>');
+            return `${MONTHS[parseInt(parts[1])-1]} ${parseInt(parts[2])}, ${parts[0]}`;
         }
 
         function renderDirectory(searchTerm = "") {
             const listContainer = document.getElementById('directory-list');
             listContainer.innerHTML = "";
-            if (!familyData || !familyData.length) return;
-
-            const isSearching = searchTerm.length > 0;
+            const lowerSearch = searchTerm.toLowerCase();
             const matches = [];
 
-            if (isSearching) {
+            if (searchTerm) {
                 familyData.forEach(p => {
                     const matchResult = searchFilter(p, searchTerm);
                     if (matchResult) matches.push({ person: p, match: matchResult });
@@ -437,72 +490,56 @@
                         const isAncestral = p.id.length < 5 && !p.id.includes('s');
                         return hideAncestors ? !isAncestral : true;
                     }
-                    const isSpouse = p.id.includes('s');
-                    const baseId = isSpouse ? p.id.split('s')[0] : p.id;
-                    const filterBaseId = filterFromId.includes('s') ? filterFromId.split('s')[0] : filterFromId;
-
-                    switch(relFilterMode) {
-                        case 'siblings':
-                            const parentPrefix = filterBaseId.substring(0, filterBaseId.length - 1);
-                            return baseId.startsWith(parentPrefix) && baseId.length === filterBaseId.length;
-                        case 'parents':
-                            return baseId === filterBaseId.substring(0, filterBaseId.length - 1);
-                        case 'children':
-                            return baseId.startsWith(filterBaseId) && baseId.length === filterBaseId.length + 1;
-                        default:
-                            return p.id.startsWith(filterFromId);
-                    }
+                    return p.id.startsWith(filterFromId);
                 });
-
-                if (relFilterMode !== 'branch' && filterFromId) {
-                    lastFilteredData.sort((a,b) => a.id.localeCompare(b.id));
-                    lastFilteredData.forEach(p => listContainer.appendChild(createPersonItem(p)));
-                } else {
-                    const sortedData = [...lastFilteredData].sort((a, b) => a.id.length - b.id.length || a.id.localeCompare(b.id));
-                    if (sortedData.length > 0) {
-                        const minLen = sortedData[0].id.length;
-                        const rootNodes = sortedData.filter(p => p.id.length === minLen);
-                        rootNodes.forEach(node => buildTreeNode(node, lastFilteredData, listContainer));
-                    }
+                const sortedData = [...lastFilteredData].sort((a, b) => a.id.length - b.id.length || a.id.localeCompare(b.id));
+                if (sortedData.length > 0) {
+                    const minLen = sortedData[0].id.length;
+                    sortedData.filter(p => p.id.length === minLen).forEach(node => buildTreeNode(node, lastFilteredData, listContainer));
                 }
             }
-            updateFilterIndicator();
             lucide.createIcons();
         }
 
+        function searchFilter(person, query) {
+            const lowerQuery = query.toLowerCase().trim();
+            const searchableFields = ['name', 'phone', 'email', 'address', 'birthday', 'id'];
+            let altQuery = null;
+            for (const [fullName, abbrev] of Object.entries(STATE_MAP)) {
+                if (lowerQuery === fullName) altQuery = abbrev.toLowerCase();
+                else if (lowerQuery === abbrev.toLowerCase()) altQuery = fullName;
+            }
+            for (const field of searchableFields) {
+                let displayValue = field === 'birthday' ? formatDate(person[field]) : (person[field] || "").toString();
+                const lowerVal = displayValue.toLowerCase();
+                if (lowerVal.includes(lowerQuery) || (altQuery && lowerVal.includes(altQuery))) {
+                    return { field, value: displayValue, match: (altQuery && lowerVal.includes(altQuery)) ? altQuery : lowerQuery };
+                }
+            }
+            return null;
+        }
+
+        function highlightMatch(text, match) {
+            if (!text) return "";
+            const regex = new RegExp(`(${match})`, 'gi');
+            return text.toString().replace(regex, '<b>$1</b>');
+        }
+
         function buildTreeNode(person, allData, container) {
-            const isSpouse = person.id.includes('s');
             const children = allData.filter(child => !child.id.includes('s') && child.id.startsWith(person.id) && child.id.length === person.id.length + 1);
             const spouses = allData.filter(s => s.id.startsWith(person.id + 's'));
-
             if (children.length > 0 || spouses.length > 0) {
                 const details = document.createElement('details');
                 details.className = "group";
                 details.open = person.id.length < 7;
-                
-                const summary = document.createElement('summary');
-                summary.className = "flex items-center hover:bg-gray-50 rounded-lg cursor-pointer transition w-full group/sum";
-                summary.innerHTML = `
-                    <div class="p-2 -mr-1 hover:bg-gray-200 rounded-l-lg transition-colors flex items-center justify-center chevron-toggle">
-                        <i data-lucide="chevron-right" class="w-4 h-4 text-gray-400 group-open:rotate-90"></i>
-                    </div>
-                    <div class="flex-1 py-2 px-1 flex items-center justify-between name-select">
+                details.innerHTML = `<summary class="flex items-center hover:bg-gray-50 rounded-lg cursor-pointer transition w-full group/sum">
+                    <div class="p-2 chevron-toggle"><i data-lucide="chevron-right" class="w-4 h-4 text-gray-400 group-open:rotate-90"></i></div>
+                    <div class="flex-1 py-2 px-1 name-select flex items-center justify-between">
                         <span class="font-medium text-gray-800">${person.name}</span>
-                        <span class="text-[10px] text-gray-400 font-mono ml-auto opacity-0 group-hover/sum:opacity-100 transition-opacity">${person.id}</span>
-                    </div>
-                `;
-                
-                summary.onclick = (e) => {
-                    if (e.target.closest('.name-select')) {
-                        e.preventDefault();
-                        selectPerson(person);
-                    }
-                };
-
-                const childBox = document.createElement('div');
-                childBox.className = "henry-indent mt-1 space-y-1";
-                details.appendChild(summary);
-                details.appendChild(childBox);
+                        <span class="text-[10px] text-gray-400 font-mono ml-auto opacity-0 group-hover/sum:opacity-100">${person.id}</span>
+                    </div></summary><div class="henry-indent mt-1 space-y-1"></div>`;
+                details.querySelector('.name-select').onclick = (e) => { e.preventDefault(); selectPerson(person); };
+                const childBox = details.querySelector('.henry-indent');
                 container.appendChild(details);
                 spouses.forEach(s => childBox.appendChild(createPersonItem(s)));
                 children.forEach(c => buildTreeNode(c, allData, childBox));
@@ -515,17 +552,12 @@
             const isSpouse = p.id.includes('s');
             const div = document.createElement('div');
             div.className = "flex items-center justify-between p-2 pl-6 hover:bg-blue-50 hover:text-blue-700 rounded-lg cursor-pointer group transition";
-            
             let rightColumnContent = p.id;
-            if (searchMatch) {
-                rightColumnContent = highlightMatch(searchMatch.value, searchMatch.match);
-            }
-
+            if (searchMatch) rightColumnContent = highlightMatch(searchMatch.value, searchMatch.match);
             div.innerHTML = `<div class="flex items-center gap-2">
                 <i data-lucide="${isSpouse ? 'link' : 'user'}" class="w-3 h-3 ${isSpouse ? 'text-pink-400' : 'text-gray-300'}"></i>
                 <span class="text-sm font-medium">${p.name}</span>
             </div><span class="text-[10px] text-gray-400 font-mono search-match truncate ml-4 max-w-[120px] text-right">${rightColumnContent}</span>`;
-            
             div.onclick = () => selectPerson(p);
             return div;
         }
@@ -539,29 +571,23 @@
                 document.getElementById('contact-panel').scrollTo(0,0);
             }
             const card = document.getElementById('contact-card');
-            const hero = document.getElementById('card-hero');
-            const empty = document.getElementById('empty-state');
-            empty.classList.add('hidden');
+            document.getElementById('empty-state').classList.add('hidden');
             card.classList.remove('hidden');
+            window.toggleEditMode(false);
             const colorIdx = p.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % COLORS.length;
-            hero.className = `p-8 text-white relative transition-colors duration-500 ${COLORS[colorIdx]}`;
+            document.getElementById('card-hero').className = `p-8 text-white relative transition-colors duration-500 ${COLORS[colorIdx]}`;
             document.getElementById('card-name').textContent = p.name;
             document.getElementById('card-id').textContent = p.id;
-            
-            // Format birthday for display
             document.getElementById('card-birthday').querySelector('span').textContent = formatDate(p.birthday);
-            
             document.getElementById('card-phone').textContent = p.phone || "Not listed";
             document.getElementById('card-phone-link').href = `tel:${p.phone}`;
             document.getElementById('card-email').textContent = p.email || "Not listed";
             document.getElementById('card-email-link').href = p.email ? `mailto:${p.email}` : "#";
             document.getElementById('card-address').textContent = p.address || "Not listed";
-            const mapLink = document.getElementById('card-map-link');
-            if (p.address) {
-                mapLink.classList.remove('hidden');
-                mapLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.address)}`;
-            } else mapLink.classList.add('hidden');
             document.getElementById('card-updated').textContent = p.updated || "Not listed";
+            const mapLink = document.getElementById('card-map-link');
+            if (p.address) { mapLink.classList.remove('hidden'); mapLink.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.address)}`; }
+            else mapLink.classList.add('hidden');
             renderBreadcrumbs(p);
             const spouseSection = document.getElementById('spouse-section');
             const baseId = p.id.includes('s') ? p.id.split('s')[0] : p.id;
@@ -571,9 +597,7 @@
                 spouseSection.classList.remove('hidden');
                 document.getElementById('card-spouse-name').textContent = spouse.name;
                 document.getElementById('card-spouse-btn').onclick = () => selectPerson(spouse);
-            } else {
-                spouseSection.classList.add('hidden');
-            }
+            } else { spouseSection.classList.add('hidden'); }
             lucide.createIcons();
         }
 
@@ -586,126 +610,78 @@
                 const ancestor = familyData.find(f => f.id === baseId.substring(0, i));
                 if (ancestor) ancestors.push(ancestor);
             }
-            let displayAncestors = ancestors;
+            let display = ancestors;
             if (!showFull && ancestors.length > 2) {
-                const allChip = document.createElement('button');
-                allChip.className = "breadcrumb-chip";
-                allChip.textContent = "Show all";
-                allChip.onclick = (e) => { e.stopPropagation(); renderBreadcrumbs(person, true); };
-                container.appendChild(allChip);
-                container.appendChild(createArrow());
-                displayAncestors = ancestors.slice(-2);
-            }
-            displayAncestors.forEach((ancestor, index) => {
                 const chip = document.createElement('button');
                 chip.className = "breadcrumb-chip";
-                chip.textContent = ancestor.name;
-                chip.onclick = () => selectPerson(ancestor);
+                chip.textContent = "Show all";
+                chip.onclick = () => renderBreadcrumbs(person, true);
+                container.appendChild(chip);
+                container.appendChild(createArrow());
+                display = ancestors.slice(-2);
+            }
+            display.forEach(a => {
+                const chip = document.createElement('button');
+                chip.className = "breadcrumb-chip";
+                chip.textContent = a.name;
+                chip.onclick = () => selectPerson(a);
                 container.appendChild(chip);
                 container.appendChild(createArrow());
             });
-            const currentName = document.createElement('span');
-            currentName.className = "text-xs font-bold opacity-90";
-            currentName.textContent = person.name;
-            container.appendChild(currentName);
+            const cur = document.createElement('span');
+            cur.className = "text-xs font-bold opacity-90";
+            cur.textContent = person.name;
+            container.appendChild(cur);
             lucide.createIcons();
         }
 
         function createArrow() {
-            const arrow = document.createElement('i');
-            arrow.setAttribute('data-lucide', 'chevron-right');
-            arrow.className = "w-3 h-3 text-white opacity-40";
-            return arrow;
+            const i = document.createElement('i');
+            i.setAttribute('data-lucide', 'chevron-right');
+            i.className = "w-3 h-3 text-white opacity-40";
+            return i;
         }
 
-        function toggleTools(e) {
-            e.stopPropagation();
-            document.getElementById('tools-dropdown').classList.toggle('dropdown-hidden');
-        }
-
-        function closeDropdowns(e) {
-            if (!e.target.closest('.dropdown-menu') && !e.target.closest('button')) {
-                document.getElementById('tools-dropdown').classList.add('dropdown-hidden');
+        async function startBackgroundGeocoding() {
+            const cache = JSON.parse(localStorage.getItem('family_geo_cache') || '{}');
+            const toGeocode = familyData.filter(p => p.address && !cache[p.address]);
+            for (const person of toGeocode) {
+                try {
+                    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(person.address)}&limit=1`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    if (data?.[0]) {
+                        cache[person.address] = { lat: data[0].lat, lon: data[0].lon };
+                        localStorage.setItem('family_geo_cache', JSON.stringify(cache));
+                    }
+                } catch (e) {}
+                await new Promise(r => setTimeout(r, 1200));
             }
         }
 
-        function exportBirthdaysICS() {
-            if (!lastFilteredData || lastFilteredData.length === 0) return;
-            toggleExportModal();
-        }
-
-        function toggleExportModal() {
-            const modal = document.getElementById('export-modal');
-            modal.classList.toggle('hidden');
-            if (!modal.classList.contains('hidden')) lucide.createIcons();
-        }
-
-        function confirmExport() {
-            const events = lastFilteredData
-                .filter(p => p.birthday && p.birthday.includes('-'))
-                .map(p => {
-                    const cleanBday = p.birthday.replace(/-/g, '');
-                    return `BEGIN:VEVENT\nSUMMARY:Birthday - ${p.name}\nDTSTART;VALUE=DATE:${cleanBday}\nRRULE:FREQ=YEARLY\nTRANSP:TRANSPARENT\nEND:VEVENT`;
-                });
-            const icsContent = `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Family Directory//EN\n${events.join('\n')}\nEND:VCALENDAR`;
-            const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', 'family_birthdays.ics');
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            toggleExportModal();
-        }
-
-        function jumpToRel(type) {
-            if (!selectedPerson) return;
-            let baseId = selectedPerson.id.includes('s') ? selectedPerson.id.split('s')[0] : selectedPerson.id;
-            filterFromId = baseId;
-            relFilterMode = type;
-            document.getElementById('filter-from-input').value = baseId;
-            renderDirectory();
-            if (window.innerWidth < 768) closeContact(true);
-        }
-
-        function closeContact(toList) {
-            if (toList) {
-                document.getElementById('sidebar').classList.remove('mobile-hidden');
-                document.getElementById('contact-panel').classList.add('mobile-hidden');
-                document.getElementById('mobile-back').classList.add('hidden');
-            } else {
-                document.getElementById('sidebar').classList.add('mobile-hidden');
-                document.getElementById('contact-panel').classList.remove('mobile-hidden');
-                document.getElementById('mobile-back').classList.remove('hidden');
+        function handleUrlParam() {
+            const id = new URLSearchParams(window.location.search).get('id');
+            if (id && !selectedPerson) {
+                const p = familyData.find(f => f.id === id);
+                if (p) selectPerson(p);
             }
         }
 
-        function handleSearch(source) { 
-            const val = source === 'mobile' ? document.getElementById('search-input-mobile').value : document.getElementById('search-input').value;
-            renderDirectory(val.trim()); 
+        function showStatus(title, desc, icon = "loader", color = "text-blue-600") {
+            const modal = document.getElementById('status-modal');
+            const iconDiv = document.getElementById('status-icon');
+            document.getElementById('status-title').textContent = title;
+            document.getElementById('status-desc').textContent = desc;
+            iconDiv.className = `w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4 bg-gray-50 ${color}`;
+            iconDiv.innerHTML = `<i data-lucide="${icon}" class="${icon === 'loader' ? 'animate-spin' : ''}"></i>`;
+            modal.classList.remove('hidden');
+            lucide.createIcons();
         }
 
-        function toggleFilters() { document.getElementById('filter-modal').classList.toggle('hidden'); }
-        function applyFilters() { 
-            filterFromId = document.getElementById('filter-from-input').value.trim();
-            relFilterMode = "branch";
-            hideAncestors = document.getElementById('filter-ancestors').checked;
-            toggleFilters(); 
-            renderDirectory(); 
-        }
-        function clearFromFilter() { 
-            document.getElementById('filter-from-input').value = ""; 
-            filterFromId = ""; 
-            relFilterMode = "branch";
-            renderDirectory(); 
-        }
-        function updateFilterIndicator() { 
-            document.getElementById('filter-indicator').classList.toggle('hidden', !filterFromId && hideAncestors); 
-        }
-        function toggleAncestorFilter() { hideAncestors = document.getElementById('filter-ancestors').checked; }
-        function editOnGithub() { window.open("https://github.com/", '_blank'); }
-        document.getElementById('password-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') checkPassword(); });
+        function hideStatus() { document.getElementById('status-modal').classList.add('hidden'); }
+
+        if (sessionStorage.getItem('family_auth') === 'true') startApp();
+        document.getElementById('password-input').onkeypress = (e) => { if (e.key === 'Enter') window.checkPassword(); };
     </script>
 </body>
 </html>
