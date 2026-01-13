@@ -36,23 +36,16 @@
     </header>
 
     <main class="relative flex overflow-hidden sidebar-height">
-        <!-- Sidebar for Failed Addresses -->
         <aside id="error-sidebar" class="hidden w-80 bg-white border-r overflow-y-auto shrink-0 transition-all duration-300">
             <div class="p-4 border-b bg-gray-50 flex items-center justify-between sticky top-0 z-10">
                 <h2 class="font-bold text-sm text-slate-800">Unmapped Locations</h2>
-                <button onclick="toggleErrorSidebar()" class="text-gray-400 hover:text-gray-600">
-                    <i data-lucide="x" class="w-4 h-4"></i>
-                </button>
+                <button onclick="toggleErrorSidebar()" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-4 h-4"></i></button>
             </div>
-            <div id="error-list" class="p-4 space-y-4">
-                <!-- Failed items injected here -->
-            </div>
+            <div id="error-list" class="p-4 space-y-4"></div>
         </aside>
 
-        <!-- Map Container -->
         <div class="flex-1 relative">
             <div id="map"></div>
-            
             <div id="loader" class="loading-overlay absolute inset-0 z-20 flex flex-col items-center justify-center">
                 <div class="w-12 h-12 border-4 border-slate-900 border-t-transparent rounded-full animate-spin mb-4"></div>
                 <p class="font-bold text-slate-900 text-lg">Loading Map Data...</p>
@@ -63,13 +56,11 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
-    <!-- Firebase Integration -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, doc, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Your specific Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyARswMnYZvOjI1__gC05deuc0RwM-xPKnk",
             authDomain: "andelin-directory.firebaseapp.com",
@@ -90,55 +81,40 @@
         const markers = [];
         const failedAddresses = [];
 
-        // --- AUTH CHECK ---
-        if (sessionStorage.getItem('family_auth') !== 'true') {
-            window.location.href = 'index.html';
-        }
+        if (sessionStorage.getItem('family_auth') !== 'true') window.location.href = 'index.html';
 
         async function init() {
             lucide.createIcons();
-            
-            // Initialize Leaflet Map
             map = L.map('map').setView([39.8283, -98.5795], 4);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
-                attribution: '© OpenStreetMap' 
-            }).addTo(map);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
 
             try {
-                // Auth anonymously for secure Firestore access
                 await signInAnonymously(auth);
-                
-                document.getElementById('progress-text').textContent = "Fetching family records...";
-                
-                // Fetch from correct path: artifacts -> {appId} -> public -> data -> members
+                document.getElementById('progress-text').textContent = "Fetching cloud records...";
                 const familyRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
                 const snapshot = await getDocs(familyRef);
-                
                 familyData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 
                 if (familyData.length === 0) {
-                    document.getElementById('progress-text').textContent = "No members found in cloud database.";
                     document.getElementById('loader').classList.add('hidden');
                     return;
                 }
 
                 await processAddresses();
             } catch (err) {
-                console.error("Firebase error:", err);
-                document.getElementById('progress-text').textContent = "Database connection failed.";
+                console.error(err);
+                document.getElementById('progress-text').textContent = "Connection failed.";
             }
         }
 
         async function processAddresses() {
             const geocodedPeople = familyData.filter(p => p.address && p.address.trim() !== "");
-            const geoCache = JSON.parse(localStorage.getItem('family_geo_cache') || '{}');
-            
-            // Group people by shared address string
             const addressGroups = {};
-            geocodedPeople.forEach(person => {
-                const addr = person.address.trim();
+            
+            geocodedPeople.forEach(p => {
+                const addr = p.address.trim();
                 if (!addressGroups[addr]) addressGroups[addr] = [];
-                addressGroups[addr].push(person);
+                addressGroups[addr].push(p);
             });
 
             const addresses = Object.keys(addressGroups);
@@ -149,42 +125,37 @@
                 count++;
                 const people = addressGroups[addr];
                 
-                // 1. Try to load from browser cache first (generated by index.html background worker)
-                const cachedCoords = geoCache[addr];
-                if (cachedCoords) {
-                    addMarker(people, cachedCoords, addr);
-                    document.getElementById('progress-text').textContent = `Loaded ${count} of ${total} locations`;
+                // 1. Check if ANY person in group already has cloud-cached coordinates
+                const cachedPerson = people.find(p => p.lat && p.lon);
+                if (cachedPerson) {
+                    addMarker(people, { lat: cachedPerson.lat, lon: cachedPerson.lon }, addr);
+                    document.getElementById('progress-text').textContent = `Loaded ${count} of ${total} locations (Cloud Optimized)`;
                     continue;
                 }
 
-                // 2. Fallback to slow Geocoding (respecting rate limits)
+                // 2. Geocode and SAVE back to cloud
                 document.getElementById('progress-text').textContent = `Plotting new address ${count} of ${total}...`;
                 try {
-                    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}&limit=1`;
-                    const res = await fetch(url, { headers: { 'User-Agent': 'FamilyDirMap' } });
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}&limit=1`);
                     const data = await res.json();
                     
-                    if (data && data.length > 0) {
-                        const coords = { lat: data[0].lat, lon: data[0].lon };
+                    if (data?.[0]) {
+                        const coords = { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
                         addMarker(people, coords, addr);
-                        // Save to cache for next time
-                        geoCache[addr] = coords;
-                        localStorage.setItem('family_geo_cache', JSON.stringify(geoCache));
-                    } else {
-                        failedAddresses.push({ address: addr, people: people });
-                    }
+                        // Save to cloud for entire family benefit
+                        for (const p of people) {
+                            await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', p.id), coords);
+                        }
+                    } else failedAddresses.push({ address: addr, people: people });
                 } catch (e) {
                     failedAddresses.push({ address: addr, people: people });
                 }
-
-                // nominatim requires roughly 1 second delay
                 await new Promise(r => setTimeout(r, 1200));
             }
 
             renderErrors();
             document.getElementById('loader').classList.add('hidden');
-            document.getElementById('status-text').textContent = `${markers.length} locations mapped`;
-            
+            document.getElementById('status-text').textContent = `${markers.length} points plotted`;
             if (markers.length > 0) {
                 const group = new L.featureGroup(markers);
                 map.fitBounds(group.getBounds().pad(0.1));
@@ -192,72 +163,50 @@
         }
 
         function renderErrors() {
-            const errorList = document.getElementById('error-list');
+            const list = document.getElementById('error-list');
             const toggle = document.getElementById('error-toggle');
-            const countLabel = document.getElementById('error-count');
-
             if (failedAddresses.length > 0) {
                 toggle.classList.remove('hidden');
-                countLabel.textContent = failedAddresses.length;
-                
-                errorList.innerHTML = failedAddresses.map(fail => `
+                document.getElementById('error-count').textContent = failedAddresses.length;
+                list.innerHTML = failedAddresses.map(fail => `
                     <div class="p-3 bg-white border border-gray-100 rounded-xl shadow-sm">
-                        <div class="flex items-start gap-3 mb-3">
-                            <i data-lucide="map-pin-off" class="w-4 h-4 text-amber-500 shrink-0 mt-0.5"></i>
-                            <p class="text-[11px] text-gray-500 font-medium leading-relaxed">${fail.address}</p>
-                        </div>
-                        <div class="space-y-2 pl-7">
-                            ${fail.people.map(p => `
-                                <div class="flex items-center justify-between gap-2">
-                                    <span class="text-xs font-bold text-slate-800">${p.name}</span>
-                                    <a href="index.html?id=${p.id}" class="text-[10px] bg-blue-600 text-white px-2 py-1 rounded font-bold hover:bg-blue-700 transition">View Profile</a>
-                                </div>
-                            `).join('')}
-                        </div>
+                        <p class="text-[11px] text-gray-500 mb-2">${fail.address}</p>
+                        ${fail.people.map(p => `
+                            <div class="flex items-center justify-between gap-2 mt-1">
+                                <span class="text-xs font-bold text-slate-800">${p.name}</span>
+                                <a href="index.html?id=${p.id}" class="text-[10px] bg-blue-600 text-white px-2 py-1 rounded font-bold">View</a>
+                            </div>
+                        `).join('')}
                     </div>
                 `).join('');
                 lucide.createIcons();
             }
         }
 
-        window.toggleErrorSidebar = function() {
-            const sidebar = document.getElementById('error-sidebar');
-            sidebar.classList.toggle('hidden');
-            setTimeout(() => { map.invalidateSize(); }, 300);
-        }
+        window.toggleErrorSidebar = () => {
+            document.getElementById('error-sidebar').classList.toggle('hidden');
+            setTimeout(() => map.invalidateSize(), 300);
+        };
 
         function addMarker(people, coords, address) {
             const marker = L.marker([coords.lat, coords.lon]).addTo(map);
-            
             const nameList = people.map(p => `
                 <div class="flex items-center justify-between gap-4 py-2 border-b border-gray-100 last:border-0">
                     <p class="font-bold text-slate-900 text-sm">${p.name}</p>
-                    <a href="index.html?id=${p.id}" class="bg-blue-600 text-white px-3 py-1.5 rounded-md text-[10px] font-bold hover:bg-blue-700 transition shadow-sm whitespace-nowrap">
-                        View Profile
-                    </a>
+                    <a href="index.html?id=${p.id}" class="bg-blue-600 text-white px-3 py-1.5 rounded-md text-[10px] font-bold whitespace-nowrap">View Profile</a>
                 </div>
             `).join('');
 
-            const popupContent = `
+            marker.bindPopup(`
                 <div class="custom-popup">
-                    <div class="mb-3">
-                        <label class="text-[9px] font-bold uppercase tracking-widest text-gray-400 block mb-1">Address</label>
-                        <p class="text-[11px] text-gray-600 font-medium leading-relaxed">${address}</p>
-                    </div>
-                    
+                    <p class="text-[11px] text-gray-600 font-medium mb-2">${address}</p>
                     <div class="max-h-48 overflow-y-auto bg-gray-50 rounded-lg p-3 border border-gray-100">
-                        <label class="text-[9px] font-bold uppercase tracking-widest text-gray-400 block mb-2">Residents</label>
-                        <div class="space-y-1">
-                            ${nameList}
-                        </div>
+                        ${nameList}
                     </div>
-                </div>`;
-                
-            marker.bindPopup(popupContent);
+                </div>`);
             markers.push(marker);
         }
 
-        // Initialize the app logic
         init();
     </script>
 </body>
