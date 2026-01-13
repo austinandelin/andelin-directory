@@ -100,7 +100,7 @@
                     <button onclick="toggleTools(event)" class="p-2 bg-gray-100 hover:bg-gray-200 rounded-full transition relative">
                         <i data-lucide="wrench" class="w-5 h-5 text-gray-600"></i>
                     </button>
-                    <div id="tools-dropdown" class="dropdown-menu dropdown-hidden absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 p-2 z-50">
+                    <div id="tools-dropdown" class="dropdown-menu dropdown-hidden absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 p-2 z-50">
                         <button onclick="openAddModal()" class="flex items-center gap-3 w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg transition text-left">
                             <i data-lucide="user-plus" class="w-4 h-4 text-blue-500"></i>
                             Add New Person
@@ -135,6 +135,7 @@
                            class="w-full px-4 py-2 border rounded-lg bg-gray-50 outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
                 
+                <!-- Relationship Filter Alert -->
                 <div id="rel-filter-alert" class="hidden m-2 p-3 bg-blue-50 border border-blue-100 rounded-lg flex items-center justify-between">
                     <div class="flex items-center gap-2 text-blue-700">
                         <i data-lucide="info" class="w-4 h-4"></i>
@@ -311,6 +312,7 @@
             </div>
         </div>
 
+        <!-- Export/Filter Modals -->
         <div id="export-modal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center hidden p-4">
             <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl text-center">
                 <div class="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4"><i data-lucide="calendar" class="w-8 h-8"></i></div>
@@ -331,7 +333,10 @@
                 </div>
                 <div class="space-y-6">
                     <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Branch ID</label>
+                        <div class="flex justify-between items-center mb-1">
+                            <label class="block text-xs font-bold text-gray-500 uppercase">Branch ID</label>
+                            <button onclick="clearFromFilter()" class="text-[10px] text-blue-500 font-bold">Clear</button>
+                        </div>
                         <input type="text" id="filter-from-input" class="w-full px-3 py-2 border rounded-lg font-mono">
                     </div>
                     <label class="flex items-center gap-2 cursor-pointer">
@@ -344,11 +349,13 @@
         </div>
     </div>
 
+    <!-- Firebase SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, updateDoc, setDoc, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // Firebase Config
         const firebaseConfig = {
             apiKey: "AIzaSyARswMnYZvOjI1__gC05deuc0RwM-xPKnk",
             authDomain: "andelin-directory.firebaseapp.com",
@@ -363,10 +370,12 @@
         const db = getFirestore(app);
         const appId = 'andelin-family';
 
+        // Constants
         const FAMILY_PASSWORD = "sillygoose";
         const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
         const COLORS = ['bg-blue-600', 'bg-indigo-600', 'bg-emerald-600', 'bg-rose-600', 'bg-amber-600', 'bg-violet-600', 'bg-teal-600'];
-        
+        const STATE_MAP = { "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR", "california": "CA", "colorado": "CO", "connecticut": "CT", "delaware": "DE", "florida": "FL", "georgia": "GA", "hawaii": "HI", "idaho": "ID", "illinois": "IL", "indiana": "IN", "iowa": "IA", "kansas": "KS", "kentucky": "KY", "louisiana": "LA", "maine": "ME", "maryland": "MD", "massachusetts": "MA", "michigan": "MI", "minnesota": "MN", "mississippi": "MS", "missouri": "MO", "montana": "MT", "nebraska": "NE", "nevada": "NV", "new hampshire": "NH", "new jersey": "NJ", "new mexico": "NM", "new york": "NY", "north carolina": "NC", "north dakota": "ND", "ohio": "OH", "oklahoma": "OK", "oregon": "OR", "pennsylvania": "PA", "rhode island": "RI", "south carolina": "SC", "south dakota": "SD", "tennessee": "TN", "texas": "TX", "utah": "UT", "vermont": "VT", "virginia": "VA", "washington": "WA", "west virginia": "WV", "wisconsin": "WI", "wyoming": "WY" };
+
         let familyData = []; 
         let lastFilteredData = [];
         let selectedPerson = null;
@@ -375,11 +384,7 @@
         let filterFromId = "";
         let relFilterMode = "branch";
 
-        /**
-         * HENRY ID PARSER
-         * Breaks a Henry ID into generations, handling (10), (11), etc correctly.
-         * Example: 112132(10) -> ['1', '1', '2', '1', '3', '2', '(10)']
-         */
+        // --- HELPERS ---
         function getHenrySegments(id) {
             if (!id) return [];
             const base = id.includes('s') ? id.split('s')[0] : id;
@@ -400,6 +405,22 @@
             return segments;
         }
 
+        function compareHenryIds(a, b) {
+            const segsA = getHenrySegments(a);
+            const segsB = getHenrySegments(b);
+            const len = Math.max(segsA.length, segsB.length);
+            for (let i = 0; i < len; i++) {
+                if (!segsA[i]) return -1;
+                if (!segsB[i]) return 1;
+                const valA = segsA[i].startsWith('(') ? parseInt(segsA[i].slice(1, -1)) : parseInt(segsA[i]);
+                const valB = segsB[i].startsWith('(') ? parseInt(segsB[i].slice(1, -1)) : parseInt(segsB[i]);
+                if (valA !== valB) return valA - valB;
+            }
+            if (a.includes('s') && !b.includes('s')) return -1;
+            if (!a.includes('s') && b.includes('s')) return 1;
+            return a.localeCompare(b);
+        }
+
         function normalizePerson(data, docId) {
             const raw = {};
             Object.keys(data).forEach(k => raw[k.toLowerCase().replace(/[^a-z]/g, '')] = data[k]);
@@ -414,6 +435,7 @@
             };
         }
 
+        // --- AUTH ---
         window.checkPassword = async function() {
             const input = document.getElementById('password-input').value;
             if (input === FAMILY_PASSWORD) {
@@ -423,7 +445,6 @@
                 document.getElementById('login-error').classList.remove('hidden');
             }
         };
-
         window.logout = () => { sessionStorage.removeItem('family_auth'); location.reload(); };
 
         async function startApp() {
@@ -444,6 +465,7 @@
             });
         }
 
+        // --- UI ---
         function formatDate(str) {
             if (!str || !str.includes('-')) return str || "Not listed";
             const p = str.split('-');
@@ -487,10 +509,7 @@
             renderBreadcrumbs(p);
             
             const spSection = document.getElementById('spouse-section');
-            const segs = getHenrySegments(p.id);
-            const isSpouse = p.id.includes('s');
-            let spId = isSpouse ? p.id.split('s')[0] : p.id + 's';
-            
+            const spId = p.id.includes('s') ? p.id.split('s')[0] : p.id + 's';
             const spouse = familyData.find(f => f.id === spId || f.id === spId + '1'); 
             if (spouse) {
                 spSection.classList.remove('hidden');
@@ -536,6 +555,7 @@
             window.toggleEditMode(false);
         };
 
+        // --- TOOLS ---
         window.confirmAddMember = async function() {
             const id = document.getElementById('add-id').value.trim();
             const name = document.getElementById('add-name').value.trim();
@@ -558,7 +578,7 @@
             row.className = "batch-row flex items-end gap-2 p-3 bg-white border border-gray-100 rounded-xl";
             row.innerHTML = `
                 <div class="flex-1"><label class="block text-[8px] font-bold text-gray-400 uppercase mb-1">Name</label><input type="text" class="batch-name w-full px-2 py-1 border rounded text-sm outline-none focus:ring-1 focus:ring-indigo-500"></div>
-                <div class="w-20"><label class="block text-[8px] font-bold text-gray-400 uppercase mb-1">ID Suffix</label><input type="text" class="batch-suffix w-full px-2 py-1 border rounded text-sm font-mono outline-none focus:ring-1 focus:ring-indigo-500" oninput="updateBatchPreview()"></div>
+                <div class="w-20"><label class="block text-[8px] font-bold text-gray-400 uppercase mb-1">ID suffix</label><input type="text" class="batch-suffix w-full px-2 py-1 border rounded text-sm font-mono outline-none focus:ring-1 focus:ring-indigo-500" oninput="updateBatchPreview()"></div>
                 <div class="w-32"><label class="block text-[8px] font-bold text-gray-400 uppercase mb-1">Birthday</label><input type="date" class="batch-birthday w-full px-2 py-1 border rounded text-sm outline-none focus:ring-1 focus:ring-indigo-500"></div>
                 <div class="w-20 hidden md:block"><label class="block text-[8px] font-bold text-gray-400 uppercase mb-1">ID Preview</label><div class="batch-preview text-[9px] text-indigo-600 font-mono font-bold truncate mt-2">---</div></div>`;
             document.getElementById('batch-rows').appendChild(row);
@@ -591,38 +611,42 @@
             window.toggleBatchModal();
         };
 
+        // --- SEARCH & DIRECTORY ---
         function renderDirectory(searchTerm = "") {
             const container = document.getElementById('directory-list');
             const banner = document.getElementById('rel-filter-alert');
+            const bannerText = document.getElementById('rel-filter-text');
             container.innerHTML = "";
-            const lower = searchTerm.toLowerCase();
+            const lowerSearch = searchTerm.toLowerCase();
 
-            if (relFilterMode !== 'branch' && filterFromId) banner.classList.remove('hidden');
-            else banner.classList.add('hidden');
+            if (relFilterMode !== 'branch' && filterFromId) {
+                banner.classList.remove('hidden');
+                bannerText.textContent = `Showing ${relFilterMode}`;
+            } else {
+                banner.classList.add('hidden');
+            }
 
             if (searchTerm) {
                 const matches = familyData.filter(p => {
                     const searchable = [p.name, p.phone, p.email, p.address, formatDate(p.birthday), p.id].join(' ').toLowerCase();
-                    return searchable.includes(lower);
+                    return searchable.includes(lowerSearch);
                 });
-                matches.sort((a,b) => (a.name || "").localeCompare(b.name || ""));
-                matches.forEach(p => container.appendChild(createPersonItem(p, { match: lower })));
+                const unique = Array.from(new Map(matches.map(m => [m.id, m])).values());
+                unique.sort((a,b) => (a.name || "").localeCompare(b.name || ""));
+                unique.forEach(p => {
+                    const matchResult = searchFilter(p, searchTerm);
+                    container.appendChild(createPersonItem(p, matchResult));
+                });
             } else {
-                lastFilteredData = familyData.filter(p => {
+                const filtered = familyData.filter(p => {
                     const bid = p.id || "";
                     const bSegs = getHenrySegments(bid);
-                    
-                    if (!filterFromId) {
-                        const isAnc = bSegs.length < 5 && !bid.includes('s');
-                        return hideAncestors ? !isAnc : true;
-                    }
-                    
+                    if (!filterFromId) return hideAncestors ? !(bSegs.length < 5 && !bid.includes('s')) : true;
                     const fSegs = getHenrySegments(filterFromId);
                     const cleanBase = bid.includes('s') ? bid.split('s')[0] : bid;
                     const cleanFBase = filterFromId.includes('s') ? filterFromId.split('s')[0] : filterFromId;
                     const cSegs = getHenrySegments(cleanBase);
                     const cfSegs = getHenrySegments(cleanFBase);
-
                     switch(relFilterMode) {
                         case 'siblings': 
                             if (cSegs.length !== cfSegs.length) return false;
@@ -632,20 +656,13 @@
                             return cSegs.length === cfSegs.length - 1 && cfSegs.slice(0, -1).every((s, i) => s === cSegs[i]);
                         case 'children': 
                             return cSegs.length === cfSegs.length + 1 && cSegs.slice(0, cfSegs.length).every((s, i) => s === cfSegs[i]);
-                        default: 
-                            return bid.startsWith(filterFromId);
+                        default: return bid.startsWith(filterFromId);
                     }
                 });
-
-                const sorted = [...lastFilteredData].sort((a, b) => {
-                    const sa = getHenrySegments(a.id).length;
-                    const sb = getHenrySegments(b.id).length;
-                    return sa - sb || (a.id || "").localeCompare(b.id || "");
-                });
-
+                const sorted = [...filtered].sort((a, b) => compareHenryIds(a.id, b.id));
                 if (sorted.length > 0) {
-                    const minSegs = getHenrySegments(sorted[0].id).length;
-                    sorted.filter(p => getHenrySegments(p.id).length === minSegs).forEach(n => buildTreeNode(n, lastFilteredData, container));
+                    const minLen = Math.min(...sorted.map(p => getHenrySegments(p.id).length));
+                    sorted.filter(p => !p.id.includes('s') && getHenrySegments(p.id).length === minLen).forEach(n => buildTreeNode(n, sorted, container));
                 }
             }
             lucide.createIcons();
@@ -653,13 +670,12 @@
 
         function buildTreeNode(p, all, cont) {
             const pSegs = getHenrySegments(p.id);
+            const sps = all.filter(s => s.id === p.id + 's' || s.id.startsWith(p.id + 's'));
             const kids = all.filter(c => {
                 if (c.id.includes('s')) return false;
                 const cSegs = getHenrySegments(c.id);
                 return cSegs.length === pSegs.length + 1 && cSegs.slice(0, pSegs.length).every((s, i) => s === pSegs[i]);
             });
-            const sps = all.filter(s => s.id.startsWith(p.id + 's'));
-            
             if (kids.length || sps.length) {
                 const det = document.createElement('details');
                 det.className = "group";
@@ -683,47 +699,74 @@
             const div = document.createElement('div');
             div.className = "flex items-center justify-between p-2 pl-6 hover:bg-blue-50 rounded-lg cursor-pointer group";
             let right = p.id;
-            if (search) {
-                const str = [p.phone, p.email, p.address, formatDate(p.birthday), p.id].join(' | ').toLowerCase();
-                if (str.includes(search.match)) {
-                    const val = [p.phone, p.email, p.address, formatDate(p.birthday), p.id].find(v => (v||"").toString().toLowerCase().includes(search.match));
-                    right = val ? val.toString().replace(new RegExp(`(${search.match})`, 'gi'), '<b>$1</b>') : p.id;
-                }
-            }
-            div.innerHTML = `<div class="flex items-center gap-2"><i data-lucide="${isSp ? 'link' : 'user'}" class="w-3 h-3 ${isSp ? 'text-pink-400' : 'text-gray-300'}"></i><span class="text-sm font-medium">${p.name}</span></div><span class="text-[10px] text-gray-400 font-mono truncate ml-4 max-w-[140px] text-right">${right}</span>`;
+            if (search && search.field !== 'name') right = highlightMatch(search.value, search.match);
+            div.innerHTML = `<div class="flex items-center gap-2"><i data-lucide="${isSp ? 'link' : 'user'}" class="w-3 h-3 ${isSp ? 'text-pink-400' : 'text-gray-300'}"></i><span class="text-sm font-medium">${p.name}</span></div><span class="text-[10px] text-gray-400 font-mono truncate ml-4 max-w-[150px] text-right">${right}</span>`;
             div.onclick = () => selectPerson(p);
             return div;
+        }
+
+        function searchFilter(p, q) {
+            const low = q.toLowerCase().trim();
+            const fields = ['phone', 'email', 'address', 'birthday', 'id', 'name'];
+            for (const f of fields) {
+                let val = f === 'birthday' ? formatDate(p[f]) : (p[f] || "").toString();
+                if (val.toLowerCase().includes(low)) return { field: f, value: val, match: low };
+            }
+            return null;
+        }
+
+        function highlightMatch(text, match) {
+            if (!text) return "";
+            return text.toString().replace(new RegExp(`(${match})`, 'gi'), '<b>$1</b>');
         }
 
         function renderBreadcrumbs(p, full = false) {
             const cont = document.getElementById('card-breadcrumbs');
             if (!cont) return;
             cont.innerHTML = "";
-            const segs = getHenrySegments(p.id);
-            const ancestors = [];
+            
+            const isSpouse = p.id.includes('s');
+            const baseId = isSpouse ? p.id.split('s')[0] : p.id;
+            const segs = getHenrySegments(baseId);
+            const pathNodes = [];
+            
             for (let i = 1; i < segs.length; i++) {
                 const ancId = segs.slice(0, i).join('');
                 const anc = familyData.find(f => f.id === ancId);
-                if (anc) ancestors.push(anc);
+                if (anc) pathNodes.push(anc);
             }
-            let disp = ancestors;
-            if (!full && ancestors.length > 2) {
+            
+            // Add descendant partner if this is a spouse
+            if (isSpouse) {
+                const partner = familyData.find(f => f.id === baseId);
+                if (partner) pathNodes.push(partner);
+            }
+
+            let disp = pathNodes;
+            if (!full && pathNodes.length > 2) {
                 const chip = document.createElement('button');
                 chip.className = "breadcrumb-chip"; chip.textContent = "Show all";
                 chip.onclick = (e) => { e.stopPropagation(); renderBreadcrumbs(p, true); };
                 cont.appendChild(chip);
                 const arr = document.createElement('i'); arr.setAttribute('data-lucide', 'chevron-right'); arr.className = "w-3 h-3 text-white opacity-40";
                 cont.appendChild(arr);
-                disp = ancestors.slice(-2);
+                disp = pathNodes.slice(-2);
             }
-            disp.forEach(a => {
+
+            disp.forEach((a, idx) => {
                 const chip = document.createElement('button');
                 chip.className = "breadcrumb-chip"; chip.textContent = a.name;
                 chip.onclick = () => selectPerson(a);
                 cont.appendChild(chip);
-                const arr = document.createElement('i'); arr.setAttribute('data-lucide', 'chevron-right'); arr.className = "w-3 h-3 text-white opacity-40";
-                cont.appendChild(arr);
+                
+                // Show link icon for first spouse connection, otherwise chevron
+                const iconName = (isSpouse && idx === disp.length - 1) ? 'link' : 'chevron-right';
+                const icon = document.createElement('i');
+                icon.setAttribute('data-lucide', iconName);
+                icon.className = "w-3 h-3 text-white opacity-40";
+                cont.appendChild(icon);
             });
+
             const cur = document.createElement('span');
             cur.className = "text-xs font-bold opacity-90";
             cur.textContent = p.name;
@@ -731,6 +774,7 @@
             lucide.createIcons();
         }
 
+        // --- HELPERS ---
         window.handleSearch = (src) => renderDirectory(document.getElementById(src === 'mobile' ? 'search-input-mobile' : 'search-input').value.trim());
         window.toggleTools = (e) => { e.stopPropagation(); document.getElementById('tools-dropdown').classList.toggle('dropdown-hidden'); };
         window.closeDropdowns = (e) => { if (!e.target.closest('.dropdown-menu')) document.getElementById('tools-dropdown').classList.add('dropdown-hidden'); };
@@ -739,40 +783,28 @@
         window.toggleBatchModal = () => document.getElementById('batch-modal').classList.toggle('hidden');
         window.toggleIdHelp = () => document.getElementById('id-help-block').classList.toggle('hidden');
         window.toggleExportModal = () => document.getElementById('export-modal').classList.toggle('hidden');
-        window.clearFromFilter = () => { filterFromId = ""; relFilterMode = "branch"; renderDirectory(); };
+        window.clearFromFilter = () => { 
+            filterFromId = ""; relFilterMode = "branch"; 
+            document.getElementById('filter-from-input').value = "";
+            renderDirectory(); 
+        };
         window.closeContact = (l) => { if (l) { document.getElementById('sidebar').classList.remove('mobile-hidden'); document.getElementById('contact-panel').classList.add('mobile-hidden'); document.getElementById('mobile-back').classList.add('hidden'); } };
         window.toggleAncestorFilter = () => { hideAncestors = document.getElementById('filter-ancestors').checked; renderDirectory(); };
-        window.applyFilters = () => { filterFromId = document.getElementById('filter-from-input').value.trim(); relFilterMode = "branch"; window.toggleFilters(); renderDirectory(); };
-        window.jumpToRel = (t) => { if (!selectedPerson) return; let bid = selectedPerson.id.includes('s') ? selectedPerson.id.split('s')[0] : selectedPerson.id; filterFromId = bid; relFilterMode = t; document.getElementById('filter-from-input').value = bid; renderDirectory(); if (window.innerWidth < 768) window.closeContact(true); };
-
-        async function startGeocoding() {
-            const cache = JSON.parse(localStorage.getItem('family_geo_cache') || '{}');
-            const toGeo = familyData.filter(p => p.address && !cache[p.address]);
-            for (const p of toGeo) {
-                try {
-                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(p.address)}&limit=1`);
-                    const data = await res.json();
-                    if (data?.[0]) { cache[p.address] = { lat: data[0].lat, lon: data[0].lon }; localStorage.setItem('family_geo_cache', JSON.stringify(cache)); }
-                } catch (e) {}
-                await new Promise(r => setTimeout(r, 1200));
-            }
-        }
-
-        function handleUrlParam() {
-            const id = new URLSearchParams(window.location.search).get('id');
-            if (id) { const p = familyData.find(f => f.id === id); if (p) selectPerson(p); }
-        }
-
-        window.openAddModal = () => {
-            document.querySelectorAll('#add-modal input, #add-modal textarea').forEach(el => el.value = "");
-            window.toggleAddModal();
+        window.applyFilters = () => { 
+            filterFromId = document.getElementById('filter-from-input').value.trim(); relFilterMode = "branch"; 
+            window.toggleFilters(); renderDirectory(); 
+        };
+        window.jumpToRel = (t) => { 
+            if (!selectedPerson) return; 
+            let bid = selectedPerson.id.includes('s') ? selectedPerson.id.split('s')[0] : selectedPerson.id; 
+            filterFromId = bid; relFilterMode = t; 
+            document.getElementById('filter-from-input').value = bid; 
+            renderDirectory(); 
+            if (window.innerWidth < 768) window.closeContact(true); 
         };
 
-        window.openBatchModal = () => {
-            document.getElementById('batch-rows').innerHTML = "";
-            window.addBatchRow(); window.addBatchRow(); window.addBatchRow();
-            window.toggleBatchModal();
-        };
+        window.openAddModal = () => { document.querySelectorAll('#add-modal input, #add-modal textarea').forEach(el => el.value = ""); window.toggleAddModal(); };
+        window.openBatchModal = () => { document.getElementById('batch-rows').innerHTML = ""; window.addBatchRow(); window.addBatchRow(); window.addBatchRow(); window.toggleBatchModal(); };
 
         document.getElementById('login-btn').addEventListener('click', window.checkPassword);
         document.getElementById('confirm-add-btn').addEventListener('click', window.confirmAddMember);
@@ -780,7 +812,6 @@
         document.getElementById('add-row-btn').addEventListener('click', window.addBatchRow);
         document.getElementById('apply-filters-btn').addEventListener('click', window.applyFilters);
         document.getElementById('password-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') window.checkPassword(); });
-        
         if (sessionStorage.getItem('family_auth') === 'true') startApp();
     </script>
 </body>
