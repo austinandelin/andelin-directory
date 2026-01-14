@@ -36,6 +36,7 @@
     </header>
 
     <main class="relative flex overflow-hidden sidebar-height">
+        <!-- Sidebar for Failed Addresses -->
         <aside id="error-sidebar" class="hidden w-80 bg-white border-r overflow-y-auto shrink-0 transition-all duration-300">
             <div class="p-4 border-b bg-gray-50 flex items-center justify-between sticky top-0 z-10">
                 <h2 class="font-bold text-sm text-slate-800">Unmapped Locations</h2>
@@ -44,8 +45,10 @@
             <div id="error-list" class="p-4 space-y-4"></div>
         </aside>
 
+        <!-- Map Container -->
         <div class="flex-1 relative">
             <div id="map"></div>
+            
             <div id="loader" class="loading-overlay absolute inset-0 z-20 flex flex-col items-center justify-center">
                 <div class="w-12 h-12 border-4 border-slate-900 border-t-transparent rounded-full animate-spin mb-4"></div>
                 <p class="font-bold text-slate-900 text-lg">Loading Map Data...</p>
@@ -56,6 +59,7 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
+    <!-- Firebase Integration -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
@@ -81,21 +85,43 @@
         const markers = [];
         const failedAddresses = [];
 
-        if (sessionStorage.getItem('family_auth') !== 'true') window.location.href = 'index.html';
+        if (sessionStorage.getItem('family_auth') !== 'true') {
+            window.location.href = 'index.html';
+        }
+
+        /**
+         * DEEP NORMALIZER: Crucial for Map to see the addresses correctly
+         */
+        function normalizePerson(data, docId) {
+            const raw = {};
+            Object.keys(data).forEach(k => raw[k.toLowerCase().replace(/[^a-z]/g, '')] = data[k]);
+            return {
+                id: data.id || docId,
+                name: data.name || data.Name || raw['name'] || "Name Missing",
+                address: data.address || data.Address || data['Mailing Address'] || raw['address'] || raw['mailingaddress'] || "",
+                lat: data.lat || raw['lat'] || null,
+                lon: data.lon || raw['lon'] || null
+            };
+        }
 
         async function init() {
             lucide.createIcons();
             map = L.map('map').setView([39.8283, -98.5795], 4);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+                attribution: '© OpenStreetMap' 
+            }).addTo(map);
 
             try {
                 await signInAnonymously(auth);
-                document.getElementById('progress-text').textContent = "Fetching cloud records...";
+                document.getElementById('progress-text').textContent = "Syncing cloud database...";
+                
                 const familyRef = collection(db, 'artifacts', appId, 'public', 'data', 'members');
                 const snapshot = await getDocs(familyRef);
-                familyData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                familyData = snapshot.docs.map(doc => normalizePerson(doc.data(), doc.id));
                 
                 if (familyData.length === 0) {
+                    document.getElementById('progress-text').textContent = "No data found.";
                     document.getElementById('loader').classList.add('hidden');
                     return;
                 }
@@ -108,10 +134,10 @@
         }
 
         async function processAddresses() {
-            const geocodedPeople = familyData.filter(p => p.address && p.address.trim() !== "");
+            const hasAddress = familyData.filter(p => p.address && p.address.trim() !== "");
             const addressGroups = {};
             
-            geocodedPeople.forEach(p => {
+            hasAddress.forEach(p => {
                 const addr = p.address.trim();
                 if (!addressGroups[addr]) addressGroups[addr] = [];
                 addressGroups[addr].push(p);
@@ -125,37 +151,43 @@
                 count++;
                 const people = addressGroups[addr];
                 
-                // 1. Check if ANY person in group already has cloud-cached coordinates
-                const cachedPerson = people.find(p => p.lat && p.lon);
-                if (cachedPerson) {
-                    addMarker(people, { lat: cachedPerson.lat, lon: cachedPerson.lon }, addr);
-                    document.getElementById('progress-text').textContent = `Loaded ${count} of ${total} locations (Cloud Optimized)`;
+                // 1. Check Cloud Cache first
+                const cached = people.find(p => p.lat && p.lon);
+                if (cached) {
+                    addMarker(people, { lat: parseFloat(cached.lat), lon: parseFloat(cached.lon) }, addr);
+                    document.getElementById('progress-text').textContent = `Loaded ${count} of ${total} locations`;
                     continue;
                 }
 
-                // 2. Geocode and SAVE back to cloud
-                document.getElementById('progress-text').textContent = `Plotting new address ${count} of ${total}...`;
+                // 2. Geocode and Save back to Firestore
+                document.getElementById('progress-text').textContent = `Plotting new location ${count} of ${total}...`;
                 try {
-                    const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}&limit=1`);
+                    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}&limit=1`;
+                    const res = await fetch(url, { headers: { 'User-Agent': 'AndelinFamilyMap-Plotter' } });
                     const data = await res.json();
                     
-                    if (data?.[0]) {
+                    if (data && data.length > 0) {
                         const coords = { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
                         addMarker(people, coords, addr);
-                        // Save to cloud for entire family benefit
+                        // Save results to cloud so they load instantly next time for everyone
                         for (const p of people) {
                             await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'members', p.id), coords);
                         }
-                    } else failedAddresses.push({ address: addr, people: people });
+                    } else {
+                        failedAddresses.push({ address: addr, people: people });
+                    }
                 } catch (e) {
                     failedAddresses.push({ address: addr, people: people });
                 }
+
+                // API Rate limit delay
                 await new Promise(r => setTimeout(r, 1200));
             }
 
             renderErrors();
             document.getElementById('loader').classList.add('hidden');
             document.getElementById('status-text').textContent = `${markers.length} points plotted`;
+            
             if (markers.length > 0) {
                 const group = new L.featureGroup(markers);
                 map.fitBounds(group.getBounds().pad(0.1));
@@ -170,38 +202,44 @@
                 document.getElementById('error-count').textContent = failedAddresses.length;
                 list.innerHTML = failedAddresses.map(fail => `
                     <div class="p-3 bg-white border border-gray-100 rounded-xl shadow-sm">
-                        <p class="text-[11px] text-gray-500 mb-2">${fail.address}</p>
-                        ${fail.people.map(p => `
-                            <div class="flex items-center justify-between gap-2 mt-1">
-                                <span class="text-xs font-bold text-slate-800">${p.name}</span>
-                                <a href="index.html?id=${p.id}" class="text-[10px] bg-blue-600 text-white px-2 py-1 rounded font-bold">View</a>
-                            </div>
-                        `).join('')}
+                        <p class="text-[11px] text-gray-500 font-medium mb-3">${fail.address}</p>
+                        <div class="space-y-2">
+                            ${fail.people.map(p => `
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="text-xs font-bold text-slate-800">${p.name}</span>
+                                    <a href="index.html?id=${p.id}" class="text-[10px] bg-blue-600 text-white px-2 py-1 rounded font-bold transition">View</a>
+                                </div>
+                            `).join('')}
+                        </div>
                     </div>
                 `).join('');
                 lucide.createIcons();
             }
         }
 
-        window.toggleErrorSidebar = () => {
-            document.getElementById('error-sidebar').classList.toggle('hidden');
-            setTimeout(() => map.invalidateSize(), 300);
-        };
+        window.toggleErrorSidebar = function() {
+            const sidebar = document.getElementById('error-sidebar');
+            sidebar.classList.toggle('hidden');
+            setTimeout(() => { map.invalidateSize(); }, 300);
+        }
 
         function addMarker(people, coords, address) {
             const marker = L.marker([coords.lat, coords.lon]).addTo(map);
             const nameList = people.map(p => `
                 <div class="flex items-center justify-between gap-4 py-2 border-b border-gray-100 last:border-0">
                     <p class="font-bold text-slate-900 text-sm">${p.name}</p>
-                    <a href="index.html?id=${p.id}" class="bg-blue-600 text-white px-3 py-1.5 rounded-md text-[10px] font-bold whitespace-nowrap">View Profile</a>
+                    <a href="index.html?id=${p.id}" class="bg-blue-600 text-white px-3 py-1.5 rounded-md text-[10px] font-bold shadow-sm">View Profile</a>
                 </div>
             `).join('');
 
             marker.bindPopup(`
                 <div class="custom-popup">
-                    <p class="text-[11px] text-gray-600 font-medium mb-2">${address}</p>
+                    <div class="mb-3">
+                        <label class="text-[9px] font-bold uppercase tracking-widest text-gray-400 block mb-1">Address</label>
+                        <p class="text-[11px] text-gray-600 font-medium leading-relaxed">${address}</p>
+                    </div>
                     <div class="max-h-48 overflow-y-auto bg-gray-50 rounded-lg p-3 border border-gray-100">
-                        ${nameList}
+                        <div class="space-y-1">${nameList}</div>
                     </div>
                 </div>`);
             markers.push(marker);
